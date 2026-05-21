@@ -7,6 +7,7 @@ import Sidebar from "@/components/sidebar";
 import { QueryProvider } from "@/components/query-provider";
 import { SidebarProvider } from "@/hooks/use-sidebar";
 import { TaskProvider } from "@/hooks/use-task-store";
+import { CommandPalette } from "@/components/command-palette";
 import { cn } from "@/lib/utils";
 import { Suspense } from "react";
 
@@ -17,6 +18,16 @@ export const metadata: Metadata = {
   description: "A modern, professional daily task planner",
   icons: {
     icon: "/favicon.svg",
+  },
+  manifest: "/manifest.json",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f172a" },
+  ],
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "TaskPlanner",
   },
 };
 
@@ -52,6 +63,7 @@ export default function RootLayout({
                     </Suspense>
                   </main>
                 </div>
+                <CommandPalette />
                 <Toaster position="bottom-right" richColors closeButton />
               </TaskProvider>
             </SidebarProvider>

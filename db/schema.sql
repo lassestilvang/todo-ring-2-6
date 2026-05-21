@@ -119,14 +119,24 @@ CREATE TRIGGER IF NOT EXISTS tasks_au AFTER UPDATE ON tasks BEGIN
     VALUES (new.rowid, new.title, new.description);
 END;
 
--- Indexes for performance
+-- Composite indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_tasks_list ON tasks(list_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date);
 CREATE INDEX IF NOT EXISTS idx_tasks_deadline ON tasks(deadline);
 CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+
+-- Composite indexes for filtered + sorted queries
+CREATE INDEX IF NOT EXISTS idx_tasks_status_date ON tasks(status, date);
+CREATE INDEX IF NOT EXISTS idx_tasks_status_sort ON tasks(status, sort_order);
+CREATE INDEX IF NOT EXISTS idx_tasks_list_status ON tasks(list_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_date_status ON tasks(date, status);
+
+-- Indexes for foreign key joins
 CREATE INDEX IF NOT EXISTS idx_subtasks_task ON subtasks(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_labels_task ON task_labels(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_labels_label ON task_labels(label_id);
 CREATE INDEX IF NOT EXISTS idx_history_task ON task_history(task_id);
 CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_task ON reminders(task_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_fired ON reminders(is_fired, remind_at);
