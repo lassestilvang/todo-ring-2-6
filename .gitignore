@@ -1,0 +1,7 @@
+node_modules/
+.next/
+*.sqlite
+.env
+.env.local
+dist/
+coverage/
