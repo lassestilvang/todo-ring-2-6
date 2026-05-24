@@ -376,10 +376,6 @@ export default function HomePage() {
     activeView,
     activeList,
     searchQuery,
-    setTasks,
-    setLists,
-    setLabels,
-    setStats,
   } = useTaskStore();
 
   // Queries
@@ -392,22 +388,6 @@ export default function HomePage() {
     queryKey: ['lists'],
     queryFn: fetchLists,
   });
-
-  const { data: labels = [] } = useQuery({
-    queryKey: ['labels'],
-    queryFn: fetchLabels,
-  });
-
-  const { data: stats } = useQuery({
-    queryKey: ['stats'],
-    queryFn: fetchStats,
-  });
-
-  // Sync to store for sidebar
-  React.useEffect(() => { setTasks(tasks); }, [tasks, setTasks]);
-  React.useEffect(() => { setLists(lists); }, [lists, setLists]);
-  React.useEffect(() => { setLabels(labels); }, [labels, setLabels]);
-  React.useEffect(() => { if (stats) setStats(stats); }, [stats, setStats]);
 
   // Mutations
   const createMutation = useMutation({
