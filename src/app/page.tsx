@@ -61,13 +61,6 @@ async function fetchLists() {
   return json.data;
 }
 
-async function fetchLabels() {
-  const res = await fetch('/api/labels');
-  const json = await res.json();
-  if (!json.success) throw new Error('Failed to fetch labels');
-  return json.data;
-}
-
 async function fetchStats() {
   const res = await fetch('/api/stats');
   const json = await res.json();
@@ -77,6 +70,11 @@ async function fetchStats() {
 
 // ─── Priority Config ─────────────────────────────────────────────────────────
 const PRIORITY_CONFIG = {
+  high: { label: 'High', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/30', border: 'border-l-red-500', icon: Flag },
+  medium: { label: 'Medium', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-l-amber-500', icon: Flag },
+  low: { label: 'Low', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-l-blue-500', icon: Flag },
+  none: { label: '', color: 'text-muted-foreground', bg: '', border: '', icon: null },
+} as const;
 
 // ─── Task Card ───────────────────────────────────────────────────────────────
 function TaskCard({
@@ -115,7 +113,6 @@ function TaskCard({
         priority.border || 'border-l-transparent'
       )}
     >
-      {/* Checkbox */}
       <button
         onClick={() => onToggle(task.id)}
         className="mt-0.5 flex-shrink-0 transition-all duration-300 hover:scale-110 active:scale-90"
@@ -134,7 +131,6 @@ function TaskCard({
         )}
       </button>
 
-      {/* Content */}
       <div className="flex-1 min-w-0 pt-0.5">
         <h3 className={cn(
           'text-[15px] font-semibold tracking-tight leading-snug transition-all duration-300',
@@ -143,7 +139,6 @@ function TaskCard({
           {task.title}
         </h3>
 
-        {/* Meta */}
         <div className="flex flex-wrap items-center gap-3 mt-2">
           {task.priority !== 'none' && (
             <span className={cn(
@@ -179,7 +174,6 @@ function TaskCard({
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
         <Button variant="ghost" size="icon" onClick={handleDelete} disabled={isDeleting}
           className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10">
@@ -265,36 +259,131 @@ function StatsBar() {
   const completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
   return (
-    <div className="flex items-center gap-4 px-1 py-2 text-xs text-muted-foreground">
-      <span className="flex items-center gap-1">
-        <span className="font-medium text-foreground">{stats.total}</span> total
-      </span>
-      <span className="flex items-center gap-1">
-        <span className="font-medium text-emerald-600 dark:text-emerald-400">{stats.completed}</span> done
-      </span>
-      <span className="flex items-center gap-1">
-        <span className="font-medium text-amber-600 dark:text-amber-400">{stats.pending}</span> pending
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-6 px-4 py-3 rounded-2xl bg-card/50 backdrop-blur-sm border border-border/50 shadow-sm mb-8"
+    >
+      <div className="flex items-center gap-4">
+        <div className="relative w-10 h-10">
+          <svg className="w-10 h-10 transform -rotate-90">
+            <circle
+              cx="20"
+              cy="20"
+              r="18"
+              stroke="currentColor"
+              strokeWidth="3"
+              fill="transparent"
+              className="text-muted/30"
+            />
+            <motion.circle
+              cx="20"
+              cy="20"
+              r="18"
+              stroke="currentColor"
+              strokeWidth="3"
+              fill="transparent"
+              strokeDasharray={113.1}
+              initial={{ strokeDashoffset: 113.1 }}
+              animate={{ strokeDashoffset: 113.1 - (113.1 * completionRate) / 100 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="text-brand-500"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">
+            {completionRate}%
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Progress</p>
+          <p className="text-sm font-bold text-foreground">{stats.completed} / {stats.total} Tasks</p>
+        </div>
+      </div>
+
+      <div className="h-8 w-px bg-border/50" />
+
+      <div className="flex-1 flex items-center gap-8">
+        <div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Pending</p>
+          <p className="text-sm font-bold text-amber-500 tabular-nums">{stats.pending}</p>
+        </div>
+        {stats.overdueCount > 0 && (
+          <div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Overdue</p>
+            <p className="text-sm font-bold text-destructive tabular-nums">{stats.overdueCount}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="hidden sm:flex items-center gap-2">
+        <div className="flex -space-x-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="w-6 h-6 rounded-full border-2 border-card bg-muted flex items-center justify-center">
+              <Sparkles className="w-3 h-3 text-brand-500/50" />
+            </div>
+          ))}
+        </div>
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Team</span>
+      </div>
+    </motion.div>
+  );
+}
 
 // ─── Page Header ─────────────────────────────────────────────────────────────
 function PageHeader({ view, listName }: { view: string; listName?: string }) {
   const titles: Record<string, string> = {
-    today: 'Today',
+    today: 'Daily Focus',
     next7: 'Next 7 Days',
-    upcoming: 'Upcoming',
+    upcoming: 'Future Plans',
     all: 'All Tasks',
     list: listName || 'Tasks',
   };
 
   const icons: Record<string, React.ReactNode> = {
-    today: <Sparkles className="w-5 h-5 text-brand-500" />,
-    next7: <CalendarClock className="w-5 h-5 text-brand-500" />,
-    upcoming: <ArrowUpDown className="w-5 h-5 text-brand-500" />,
-    all: <ListFilter className="w-5 h-5 text-brand-500" />,
+    today: <Sparkles className="w-8 h-8 text-brand-500" />,
+    next7: <CalendarClock className="w-8 h-8 text-brand-500" />,
+    upcoming: <ArrowUpDown className="w-8 h-8 text-brand-500" />,
+    all: <ListFilter className="w-8 h-8 text-brand-500" />,
   };
 
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
+  return (
+    <div className="mb-10">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-12 h-12 rounded-2xl bg-brand-500/10 flex items-center justify-center border border-brand-500/20 shadow-inner"
+          >
+            {icons[view] || <ListFilter className="w-6 h-6 text-brand-500" />}
+          </motion.div>
+          <div>
+            <motion.h1
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              className="text-3xl font-black tracking-tight text-foreground"
+            >
+              {titles[view]}
+            </motion.h1>
+            <motion.p
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-sm font-medium text-muted-foreground/80 flex items-center gap-2 mt-0.5"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              {dateStr}
+            </motion.p>
+          </div>
+        </div>
+      </div>
+      <StatsBar />
+    </div>
+  );
+}
 
 // ─── Empty State ─────────────────────────────────────────────────────────────
 function EmptyState({ view, onAddClick }: { view: string; onAddClick: () => void }) {
@@ -310,15 +399,18 @@ function EmptyState({ view, onAddClick }: { view: string; onAddClick: () => void
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-        <Sparkles className="w-8 h-8 text-muted-foreground/40" />
+      className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="w-20 h-20 rounded-3xl bg-muted/50 flex items-center justify-center mb-6 shadow-inner">
+        <Sparkles className="w-10 h-10 text-muted-foreground/20" />
       </div>
-      <h3 className="text-lg font-semibold text-foreground mb-1">{msg.title}</h3>
-      <p className="text-sm text-muted-foreground mb-6 max-w-sm">{msg.desc}</p>
-      <Button onClick={onAddClick} size="sm">
-        <Plus className="w-4 h-4 mr-1" /> Add Task
+      <h3 className="text-xl font-bold text-foreground mb-2">{msg.title}</h3>
+      <p className="text-sm text-muted-foreground mb-8 max-w-xs">{msg.desc}</p>
+      <Button onClick={onAddClick} size="lg" className="rounded-xl px-8 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all">
+        <Plus className="w-5 h-5 mr-2" /> Add Your First Task
       </Button>
+    </motion.div>
+  );
+}
 
 // ─── Task List ───────────────────────────────────────────────────────────────
 function TaskList({
@@ -336,10 +428,10 @@ function TaskList({
 }) {
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 rounded-lg bg-muted/50 animate-pulse"
-            style={{ animationDelay: `${i * 100}ms` }} />
+      <div className="space-y-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-24 rounded-xl bg-muted/40 animate-pulse border border-border/50"
+            style={{ animationDelay: `${i * 150}ms` }} />
         ))}
       </div>
     );
@@ -349,10 +441,10 @@ function TaskList({
   const completedTasks = tasks.filter((t) => t.status === 'completed');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <AnimatePresence mode="popLayout">
         {pendingTasks.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {pendingTasks.map((task) => (
               <TaskCard key={task.id} task={task} onToggle={onToggle}
                 onDelete={onDelete} onUpdate={onUpdate} />
@@ -362,12 +454,33 @@ function TaskList({
       </AnimatePresence>
 
       {completedTasks.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground font-medium">
-              {completedTasks.length} completed
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
+            <span className="text-[11px] text-muted-foreground font-bold uppercase tracking-[0.2em]">
+              {completedTasks.length} Completed
             </span>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
+          </div>
+          <AnimatePresence mode="popLayout">
+            <div className="space-y-3">
+              {completedTasks.map((task) => (
+                <TaskCard key={task.id} task={task} onToggle={onToggle}
+                  onDelete={onDelete} onUpdate={onUpdate} />
+              ))}
+            </div>
+          </AnimatePresence>
+        </div>
+      )}
+
+      {pendingTasks.length === 0 && completedTasks.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-sm text-muted-foreground font-medium italic">No tasks found for this view</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Main App ────────────────────────────────────────────────────────────────
 export default function HomePage() {
@@ -511,10 +624,10 @@ export default function HomePage() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="max-w-3xl mx-auto">
           <PageHeader view={activeView} listName={listName} />
-          <div className="space-y-6">
+          <div className="space-y-10">
             <QuickAdd onAdd={handleAdd} />
             {filteredTasks.length === 0 && !isLoading ? (
               <EmptyState view={activeView} onAddClick={() => document.querySelector('input')?.focus()} />
@@ -533,102 +646,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-            <div className="h-px flex-1 bg-border" />
-          </div>
-          <AnimatePresence mode="popLayout">
-            <div className="space-y-2">
-              {completedTasks.map((task) => (
-                <TaskCard key={task.id} task={task} onToggle={onToggle}
-                  onDelete={onDelete} onUpdate={onUpdate} />
-              ))}
-            </div>
-          </AnimatePresence>
-        </div>
-      )}
-
-      {pendingTasks.length === 0 && completedTasks.length === 0 && (
-        <p className="text-center text-sm text-muted-foreground py-8">No tasks to show</p>
-      )}
-    </div>
-  );
-}
-
-    </motion.div>
-  );
-}
-
-  return (
-    <div className="flex items-center justify-between mb-6">
-      <div>
-        <div className="flex items-center gap-2">
-          {icons[view]}
-          <h1 className="text-2xl font-bold text-foreground">{titles[view]}</h1>
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">{dateStr}</p>
-      </div>
-    </div>
-  );
-}
-
-      </span>
-      {stats.overdueCount > 0 && (
-        <Badge variant="destructive" className="text-[10px]">{stats.overdueCount} overdue</Badge>
-      )}
-      <div className="flex-1" />
-      <div className="flex items-center gap-2">
-        <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden">
-          <div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-emerald-500 transition-all duration-500"
-            style={{ width: `${completionRate}%` }} />
-        </div>
-        <span className="tabular-nums">{completionRate}%</span>
-      </div>
-    </div>
-  );
-}
-
-          {task.priority !== 'none' && (
-            <span className={cn('inline-flex items-center gap-1 text-xs font-medium', priority.color)}>
-              <priority.icon className="w-3 h-3" />
-              {priority.label}
-            </span>
-          )}
-          {task.date && (
-            <span className={cn(
-              'inline-flex items-center gap-1 text-xs',
-              isToday(parseISO(task.date)) ? 'text-brand-600 font-medium' : 'text-muted-foreground'
-            )}>
-              <Calendar className="w-3 h-3" />
-              {isToday(parseISO(task.date)) ? 'Today' :
-               isTomorrow(parseISO(task.date)) ? 'Tomorrow' :
-               format(parseISO(task.date), 'MMM d')}
-            </span>
-          )}
-          {isOverdue && (
-            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Overdue</Badge>
-          )}
-          {task.status === 'completed' && task.completedAt && (
-            <span className="text-xs text-muted-foreground">
-              Done {format(parseISO(task.completedAt), 'MMM d, HH:mm')}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="xs" onClick={handleDelete} disabled={isDeleting}
-          className="text-muted-foreground hover:text-destructive">
-          {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-        </Button>
-      </div>
-    </motion.div>
-  );
-}
-
-  high: { label: 'High', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/30', border: 'border-l-red-500', icon: Flag },
-  medium: { label: 'Medium', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-l-amber-500', icon: Flag },
-  low: { label: 'Low', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-l-blue-500', icon: Flag },
-  none: { label: '', color: 'text-muted-foreground', bg: '', border: '', icon: null },
-} as const;
-
