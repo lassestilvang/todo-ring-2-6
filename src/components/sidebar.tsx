@@ -12,6 +12,8 @@ import { useSidebar } from '@/hooks/use-sidebar';
 import { useTaskStore } from '@/hooks/use-task-store';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { useQuery } from '@tanstack/react-query';
+import { ListCreateDialog } from '@/components/list-create-dialog';
 
 const VIEWS = [
   { id: 'today', name: 'Today', icon: Calendar, shortcut: 'T' },
@@ -19,10 +21,6 @@ const VIEWS = [
   { id: 'upcoming', name: 'Upcoming', icon: Calendar, shortcut: 'U' },
   { id: 'all', name: 'All Tasks', icon: ListTodo, shortcut: 'A' },
 ];
-
-import { useQuery } from '@tanstack/react-query';
-
-// ... (existing imports)
 
 async function fetchLists() {
   const res = await fetch('/api/lists');
@@ -40,6 +38,7 @@ async function fetchLabels() {
 
 export default function Sidebar() {
   const { isOpen, toggle } = useSidebar();
+  const [isListDialogOpen, setIsListDialogOpen] = React.useState(false);
   const { 
     activeView, 
     setActiveView, 
@@ -155,7 +154,12 @@ export default function Sidebar() {
                 <h4 className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-[0.2em]">
                   Lists
                 </h4>
-                <Button variant="ghost" size="icon" className="w-5 h-5 rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsListDialogOpen(true)}
+                  className="w-5 h-5 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                >
                   <Plus className="w-3 h-3" />
                 </Button>
               </div>
@@ -226,6 +230,11 @@ export default function Sidebar() {
           </div>
         </div>
       </motion.aside>
+
+      <ListCreateDialog 
+        open={isListDialogOpen} 
+        onOpenChange={setIsListDialogOpen} 
+      />
     </>
   );
 }
