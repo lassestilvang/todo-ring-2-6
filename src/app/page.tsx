@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useTaskStore } from '@/hooks/use-task-store';
+import { TaskDetailDialog } from '@/components/task-detail-dialog';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Task {
@@ -82,17 +83,20 @@ function TaskCard({
   onToggle,
   onDelete,
   onUpdate,
+  onSelect,
 }: {
   task: Task;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdate: (id: string, data: Partial<Task>) => void;
+  onSelect: (task: Task) => void;
 }) {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const priority = PRIORITY_CONFIG[task.priority];
   const isOverdue = task.deadline && isPast(parseISO(task.deadline)) && task.status !== 'completed';
 
-  const handleDelete = async () => {
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsDeleting(true);
     onDelete(task.id);
   };
@@ -104,17 +108,18 @@ function TaskCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
       whileHover={{ y: -2 }}
+      onClick={() => onSelect(task)}
       className={cn(
-        'group relative flex items-start gap-4 rounded-xl border bg-card p-4 transition-all duration-300',
+        'group relative flex items-start gap-4 rounded-xl border bg-card/60 backdrop-blur-sm p-4 transition-all duration-300 cursor-pointer',
         'hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]',
-        'hover:border-primary/20',
+        'hover:border-primary/20 hover:bg-card',
         task.status === 'completed' ? 'opacity-60 grayscale-[0.5]' : '',
         'border-l-[6px]',
         priority.border || 'border-l-transparent'
       )}
     >
       <button
-        onClick={() => onToggle(task.id)}
+        onClick={(e) => { e.stopPropagation(); onToggle(task.id); }}
         className="mt-0.5 flex-shrink-0 transition-all duration-300 hover:scale-110 active:scale-90"
       >
         {task.status === 'completed' ? (
@@ -138,8 +143,13 @@ function TaskCard({
         )}>
           {task.title}
         </h3>
+        {task.description && (
+          <p className="text-xs text-muted-foreground/60 line-clamp-1 mt-1 font-medium">
+            {task.description}
+          </p>
+        )}
 
-        <div className="flex flex-wrap items-center gap-3 mt-2">
+        <div className="flex flex-wrap items-center gap-3 mt-2.5">
           {task.priority !== 'none' && (
             <span className={cn(
               'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider',
@@ -418,12 +428,14 @@ function TaskList({
   onToggle,
   onDelete,
   onUpdate,
+  onSelect,
   isLoading,
 }: {
   tasks: Task[];
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdate: (id: string, data: Partial<Task>) => void;
+  onSelect: (task: Task) => void;
   isLoading: boolean;
 }) {
   if (isLoading) {
@@ -447,7 +459,7 @@ function TaskList({
           <div className="space-y-3">
             {pendingTasks.map((task) => (
               <TaskCard key={task.id} task={task} onToggle={onToggle}
-                onDelete={onDelete} onUpdate={onUpdate} />
+                onDelete={onDelete} onUpdate={onUpdate} onSelect={onSelect} />
             ))}
           </div>
         )}
@@ -466,7 +478,7 @@ function TaskList({
             <div className="space-y-3">
               {completedTasks.map((task) => (
                 <TaskCard key={task.id} task={task} onToggle={onToggle}
-                  onDelete={onDelete} onUpdate={onUpdate} />
+                  onDelete={onDelete} onUpdate={onUpdate} onSelect={onSelect} />
               ))}
             </div>
           </AnimatePresence>
@@ -485,11 +497,19 @@ function TaskList({
 // ─── Main App ────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const queryClient = useQueryClient();
+  const [selectedTask, setSelectedTask] = React.useState<Task | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = React.useState(false);
+
   const {
     activeView,
     activeList,
     searchQuery,
   } = useTaskStore();
+
+  const handleSelect = (task: Task) => {
+    setSelectedTask(task);
+    setIsDetailOpen(true);
+  };
 
   // Queries
   const { data: tasks = [], isLoading } = useQuery({
@@ -637,12 +657,18 @@ export default function HomePage() {
                 onToggle={handleToggle}
                 onDelete={handleDelete}
                 onUpdate={handleUpdate}
+                onSelect={handleSelect}
                 isLoading={isLoading}
               />
             )}
           </div>
         </div>
       </div>
+      <TaskDetailDialog 
+        task={selectedTask} 
+        open={isDetailOpen} 
+        onOpenChange={setIsDetailOpen} 
+      />
     </div>
   );
 }

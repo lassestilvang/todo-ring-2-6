@@ -50,7 +50,8 @@ export default function RootLayout({
               <TaskProvider>
                 <div className="flex h-screen overflow-hidden">
                   <Sidebar />
-                  <main className="flex-1 overflow-y-auto bg-[linear-gradient(to_bottom,transparent_0%,transparent_calc(100%-200px),hsl(var(--background))_200px)]">
+                  <main className="flex-1 overflow-y-auto relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-500/5 via-background to-background">
+                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-soft-light" />
                     <Suspense fallback={
                       <div className="flex items-center justify-center h-full">
                         <div className="flex flex-col items-center gap-3">
