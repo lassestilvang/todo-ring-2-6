@@ -102,43 +102,98 @@ function TaskCard({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, x: -100, scale: 0.8, transition: { duration: 0.2 } }}
+      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
+      whileHover={{ y: -2 }}
       className={cn(
-        'group relative flex items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-all duration-200 hover:shadow-md',
-        task.status === 'completed' ? 'opacity-60' : '',
-        'border-l-4',
+        'group relative flex items-start gap-4 rounded-xl border bg-card p-4 transition-all duration-300',
+        'hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]',
+        'hover:border-primary/20',
+        task.status === 'completed' ? 'opacity-60 grayscale-[0.5]' : '',
+        'border-l-[6px]',
         priority.border || 'border-l-transparent'
       )}
     >
       {/* Checkbox */}
       <button
         onClick={() => onToggle(task.id)}
-        className="mt-0.5 flex-shrink-0 transition-transform duration-200 hover:scale-110 active:scale-95"
+        className="mt-0.5 flex-shrink-0 transition-all duration-300 hover:scale-110 active:scale-90"
       >
         {task.status === 'completed' ? (
-          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+          <div className="relative">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500 fill-emerald-50 dark:fill-emerald-950/30" />
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute inset-0 rounded-full bg-emerald-500/20 -z-10"
+            />
+          </div>
         ) : (
-          <Circle className="w-5 h-5 text-muted-foreground/40 hover:text-primary/60 transition-colors" />
+          <Circle className="w-6 h-6 text-muted-foreground/30 hover:text-primary/50 transition-colors" />
         )}
       </button>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 pt-0.5">
         <h3 className={cn(
-          'text-sm font-medium leading-tight transition-all',
-          task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'
+          'text-[15px] font-semibold tracking-tight leading-snug transition-all duration-300',
+          task.status === 'completed' ? 'line-through text-muted-foreground/70' : 'text-foreground/90'
         )}>
           {task.title}
         </h3>
 
         {/* Meta */}
-        <div className="flex flex-wrap items-center gap-2 mt-1.5">
+        <div className="flex flex-wrap items-center gap-3 mt-2">
+          {task.priority !== 'none' && (
+            <span className={cn(
+              'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider',
+              priority.bg,
+              priority.color
+            )}>
+              <priority.icon className="w-3 h-3" />
+              {priority.label}
+            </span>
+          )}
+          {task.date && (
+            <span className={cn(
+              'inline-flex items-center gap-1.5 text-[12px]',
+              isToday(parseISO(task.date)) ? 'text-brand-600 font-semibold' : 'text-muted-foreground/80'
+            )}>
+              <Calendar className="w-3.5 h-3.5" />
+              {isToday(parseISO(task.date)) ? 'Today' :
+               isTomorrow(parseISO(task.date)) ? 'Tomorrow' :
+               format(parseISO(task.date), 'MMM d')}
+            </span>
+          )}
+          {isOverdue && (
+            <Badge variant="destructive" className="text-[10px] h-5 px-2 rounded-md font-bold uppercase tracking-tighter">
+              Overdue
+            </Badge>
+          )}
+          {task.status === 'completed' && task.completedAt && (
+            <span className="text-[11px] text-muted-foreground/60 font-medium italic">
+              Done {format(parseISO(task.completedAt), 'MMM d, HH:mm')}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
+        <Button variant="ghost" size="icon" onClick={handleDelete} disabled={isDeleting}
+          className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+          {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
 
 // ─── Quick Add ───────────────────────────────────────────────────────────────
 function QuickAdd({ onAdd }: { onAdd: (title: string) => void }) {
   const [title, setTitle] = React.useState('');
+  const [isFocused, setIsFocused] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -162,20 +217,37 @@ function QuickAdd({ onAdd }: { onAdd: (title: string) => void }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative">
-      <div className="relative">
-        <Plus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
+    <form onSubmit={handleSubmit} className="relative group">
+      <motion.div
+        animate={isFocused ? { scale: 1.01 } : { scale: 1 }}
+        className="relative"
+      >
+        <div className={cn(
+          "absolute inset-0 bg-primary/5 rounded-xl blur-xl transition-opacity duration-500",
+          isFocused ? "opacity-100" : "opacity-0"
+        )} />
+        <Plus className={cn(
+          "absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-300",
+          isFocused ? "text-primary" : "text-muted-foreground/40"
+        )} />
         <Input
           ref={inputRef}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Add a task... (⌘K)"
-          className="pl-9 pr-20 h-12 text-base bg-card border-dashed focus:border-solid focus:border-primary/50 transition-all"
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder="What needs to be done? (⌘K)"
+          className={cn(
+            "pl-12 pr-24 h-14 text-base rounded-xl bg-card/50 backdrop-blur-sm border-2 border-dashed transition-all duration-500",
+            isFocused ? "border-primary/50 border-solid shadow-lg bg-card" : "border-muted-foreground/10 hover:border-muted-foreground/20"
+          )}
         />
-        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-1 rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-          ⌘K
-        </kbd>
-      </div>
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+          <kbd className="hidden sm:inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest">
+            ⌘K
+          </kbd>
+        </div>
+      </motion.div>
     </form>
   );
 }
@@ -374,12 +446,37 @@ export default function HomePage() {
       if (!json.success) throw new Error(json.error || 'Failed to toggle task');
       return json.data;
     },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks', activeView, activeList] });
+      const previousTasks = queryClient.getQueryData(['tasks', activeView, activeList]);
+      
+      queryClient.setQueryData(['tasks', activeView, activeList], (old: Task[] | undefined) => {
+        return old?.map(t => {
+          if (t.id === id) {
+            const isNowCompleted = t.status !== 'completed';
+            return {
+              ...t,
+              status: isNowCompleted ? 'completed' : 'pending',
+              completedAt: isNowCompleted ? new Date().toISOString() : null,
+            };
+          }
+          return t;
+        });
+      });
+      
+      return { previousTasks };
+    },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       if (data.status === 'completed') toast('Task completed! 🎉', { icon: '✅' });
     },
-    onError: (err: Error) => { toast.error(err.message); },
+    onError: (err: Error, id, context) => {
+      queryClient.setQueryData(['tasks', activeView, activeList], context?.previousTasks);
+      toast.error(err.message);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -388,12 +485,27 @@ export default function HomePage() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to delete task');
     },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks', activeView, activeList] });
+      const previousTasks = queryClient.getQueryData(['tasks', activeView, activeList]);
+      
+      queryClient.setQueryData(['tasks', activeView, activeList], (old: Task[] | undefined) => {
+        return old?.filter(t => t.id !== id);
+      });
+      
+      return { previousTasks };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       toast.success('Task deleted');
     },
-    onError: (err: Error) => { toast.error(err.message); },
+    onError: (err: Error, id, context) => {
+      queryClient.setQueryData(['tasks', activeView, activeList], context?.previousTasks);
+      toast.error(err.message);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
   });
 
   const handleAdd = (title: string) => createMutation.mutate(title);
