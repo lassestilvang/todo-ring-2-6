@@ -150,7 +150,7 @@ function TaskCard({
         )}
 
         <div className="flex flex-wrap items-center gap-3 mt-2.5">
-          {task.priority !== 'none' && (
+          {task.priority !== 'none' && priority.icon && (
             <span className={cn(
               'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider',
               priority.bg,
@@ -159,8 +159,7 @@ function TaskCard({
               <priority.icon className="w-3 h-3" />
               {priority.label}
             </span>
-          )}
-          {task.date && (
+          )}          {task.date && (
             <span className={cn(
               'inline-flex items-center gap-1.5 text-[12px]',
               isToday(parseISO(task.date)) ? 'text-brand-600 font-semibold' : 'text-muted-foreground/80'
@@ -405,7 +404,7 @@ function EmptyState({ view, onAddClick }: { view: string; onAddClick: () => void
     list: { title: 'This list is empty', desc: 'Add tasks to this list to get organized.' },
   };
 
-  const msg = messages[view] || messages.all;
+  const msg = messages[view] || messages.all || { title: 'No tasks', desc: 'No tasks to show.' };
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}

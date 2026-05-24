@@ -1,5 +1,5 @@
 import { getDb } from '../db/index.js';
-import type { List, Task, Subtask, Label, TaskLabel, TaskHistory } from '../types/index.js';
+import type { List, Task, Subtask, Label, TaskLabel, TaskHistory } from '../src/types/index.js';
 
 // === List Operations ===
 

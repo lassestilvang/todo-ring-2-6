@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 
 interface TaskContextType {
   // State
@@ -76,7 +76,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       lists, setLists,
       labels, setLabels,
       stats, setStats,
-      isLoading, setIsLoading,
+      isLoading,
       addTask, updateTaskInStore, removeTask, toggleTask,
     }}>
       {children}
