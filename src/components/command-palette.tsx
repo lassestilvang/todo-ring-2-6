@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Calendar, Clock, ListTodo, Sparkles, Plus, Command as CommandIcon } from 'lucide-react';
 import { useTaskStore } from '@/hooks/use-task-store';
 import { useQuery } from '@tanstack/react-query';
-import { cn } from '@/lib/utils';
 
 async function fetchLists() {
   const res = await fetch('/api/lists');
