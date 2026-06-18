@@ -1,21 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { initDb } from '@/db/index';
+import { NextResponse } from 'next/server';
+import { ensureDbInitialized } from '@/lib/db-init';
 import { getTaskStats, getOverdueCount, getCompletedTodayCount } from '@/db/operations';
+import { jsonSuccess, jsonError } from '@/lib/api-response';
 
-try {
-  initDb();
-} catch (e) {}
+// Ensure database is initialized
+ensureDbInitialized();
 
 export async function GET() {
   try {
     const stats = getTaskStats();
     const overdueCount = getOverdueCount();
     const completedToday = getCompletedTodayCount();
-    return NextResponse.json({
-      success: true,
-      data: { ...stats, overdueCount, completedToday },
-    });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message || 'Failed to fetch stats' }, { status: 500 });
+    return jsonSuccess({ ...stats, overdueCount, completedToday });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch stats';
+    return jsonError(message, 500, 'STATS_ERROR');
   }
 }
