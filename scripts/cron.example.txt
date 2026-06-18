@@ -1,0 +1,21 @@
+# TaskPlanner Cron Configuration
+# Copy this to your crontab: crontab -e
+# Or add to a deployment script
+
+# Run notification scheduler every 5 minutes
+*/5 * * * * cd /path/to/taskplanner && npm run notification:process >> /var/log/taskplanner-notifications.log 2>&1
+
+# Run recurring task processor daily at midnight
+0 0 * * * cd /path/to/taskplanner && npm run recurring >> /var/log/taskplanner-recurring.log 2>&1
+
+# Run backup daily at 2 AM
+0 2 * * * cd /path/to/taskplanner && npm run db:backup >> /var/log/taskplanner-backup.log 2>&1
+
+# Environment variables needed:
+# SMTP_HOST=smtp.gmail.com
+# SMTP_PORT=587
+# SMTP_USER=your-email@gmail.com
+# SMTP_PASS=your-app-password
+# NEXT_PUBLIC_VAPID_PUBLIC_KEY=your-vapid-public-key
+# VAPID_PRIVATE_KEY=your-vapid-private-key
+# DATABASE_URL=/path/to/db.sqlite
