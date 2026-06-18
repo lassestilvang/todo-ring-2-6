@@ -7,11 +7,22 @@ import Sidebar from "@/components/sidebar";
 import { QueryProvider } from "@/components/query-provider";
 import { SidebarProvider } from "@/hooks/use-sidebar";
 import { TaskProvider } from "@/hooks/use-task-store";
+import { AuthProvider } from "@/hooks/use-auth";
 import { CommandPalette } from "@/components/command-palette";
+import { NotificationListener } from "@/components/notification-listener";
+import { CollaborationIndicator } from "@/components/user-profile";
 import { cn } from "@/lib/utils";
 import { Suspense } from "react";
+import React from "react";
 
 const inter = Inter({ subsets: ["latin"] });
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
   title: "TaskPlanner - Daily Task Manager",
@@ -47,10 +58,11 @@ export default function RootLayout({
         >
           <QueryProvider>
             <SidebarProvider>
-              <TaskProvider>
+              <AuthProvider>
+                <TaskProvider>
                 <div className="flex h-screen overflow-hidden">
                   <Sidebar />
-                  <main className="flex-1 overflow-y-auto relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-500/5 via-background to-background">
+                  <main className="flex-1 overflow-y-auto relative bg-gradient-to-b from-brand-500/5 via-background to-background">
                     <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-soft-light" />
                     <Suspense fallback={
                       <div className="flex items-center justify-center h-full">
@@ -65,8 +77,11 @@ export default function RootLayout({
                   </main>
                 </div>
                 <CommandPalette />
+                <NotificationListener />
+                <CollaborationIndicator />
                 <Toaster position="bottom-right" richColors closeButton />
               </TaskProvider>
+              </AuthProvider>
             </SidebarProvider>
           </QueryProvider>
         </ThemeProvider>
