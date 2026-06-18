@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     list_id TEXT REFERENCES lists(id) ON DELETE CASCADE,
     date TEXT, -- Scheduled date (YYYY-MM-DD)
     deadline TEXT, -- Deadline date (YYYY-MM-DD)
+    reminder_time TEXT, -- Reminder datetime (YYYY-MM-DDTHH:mm:ss)
     estimate_hours INTEGER DEFAULT 0,
     estimate_minutes INTEGER DEFAULT 0,
     actual_hours INTEGER DEFAULT 0,
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     recurring_type TEXT DEFAULT 'none' CHECK(recurring_type IN ('none', 'daily', 'weekly', 'weekdays', 'monthly', 'yearly', 'custom')),
     recurring_interval TEXT DEFAULT '', -- Custom recurring rule
     is_all_day INTEGER DEFAULT 0,
+    is_habit INTEGER DEFAULT 0,
     completed_at TEXT,
     sort_order INTEGER DEFAULT 0,
     created_at TEXT NOT NULL,
@@ -93,6 +95,62 @@ CREATE TABLE IF NOT EXISTS reminders (
     is_fired INTEGER DEFAULT 0
 );
 
+-- Task dependencies (blocking relationships)
+CREATE TABLE IF NOT EXISTS task_dependencies (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    depends_on_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    UNIQUE(task_id, depends_on_id)
+);
+
+-- Task sharing (collaboration)
+CREATE TABLE IF NOT EXISTS task_shares (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    role TEXT DEFAULT 'viewer' CHECK(role IN ('viewer', 'editor', 'admin')),
+    created_at TEXT NOT NULL
+);
+
+-- List sharing
+CREATE TABLE IF NOT EXISTS list_shares (
+    id TEXT PRIMARY KEY,
+    list_id TEXT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    role TEXT DEFAULT 'viewer' CHECK(role IN ('viewer', 'editor', 'admin')),
+    created_at TEXT NOT NULL
+);
+
+-- Comments on tasks (with threading support)
+CREATE TABLE IF NOT EXISTS task_comments (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    parent_id TEXT REFERENCES task_comments(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_comments_parent ON task_comments(parent_id);
+CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id);
+
+-- Comment mentions (for @user notifications)
+CREATE TABLE IF NOT EXISTS comment_mentions (
+    id TEXT PRIMARY KEY,
+    comment_id TEXT NOT NULL REFERENCES task_comments(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    is_notified INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_comment_mentions_user ON comment_mentions(user_id);
+CREATE INDEX IF NOT EXISTS idx_comment_mentions_notified ON comment_mentions(is_notified);
+
 -- Search index for fuzzy search
 CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
     title, 
@@ -140,3 +198,101 @@ CREATE INDEX IF NOT EXISTS idx_history_task ON task_history(task_id);
 CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_task ON reminders(task_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_fired ON reminders(is_fired, remind_at);
+
+-- Task Templates table
+CREATE TABLE IF NOT EXISTS task_templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    icon TEXT DEFAULT '📋',
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    priority TEXT DEFAULT 'none' CHECK(priority IN ('high', 'medium', 'low', 'none')),
+    estimate_hours INTEGER DEFAULT 0,
+    estimate_minutes INTEGER DEFAULT 0,
+    is_all_day INTEGER DEFAULT 0,
+    recurring_type TEXT DEFAULT 'none',
+    label_ids TEXT DEFAULT '[]', -- JSON array of label IDs
+    category TEXT DEFAULT 'general',
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    usage_count INTEGER DEFAULT 0
+);
+
+-- Habit streaks table
+CREATE TABLE IF NOT EXISTS habit_streaks (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    current_streak INTEGER DEFAULT 0,
+    longest_streak INTEGER DEFAULT 0,
+    last_completed TEXT,
+    streak_start TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_habit_streaks_task ON habit_streaks(task_id);
+
+-- Recurring task exceptions
+CREATE TABLE IF NOT EXISTS recurring_exceptions (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    exception_date TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(task_id, exception_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_recurring_exceptions_task ON recurring_exceptions(task_id);
+CREATE INDEX IF NOT EXISTS idx_recurring_exceptions_date ON recurring_exceptions(exception_date);
+
+-- Saved filter views
+CREATE TABLE IF NOT EXISTS saved_views (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    icon TEXT DEFAULT '🔍',
+    filters TEXT NOT NULL, -- JSON string of filter configuration
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- Users table (for comments, sharing, mentions)
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT,
+    avatar TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- Audit logs for security events
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    user_id TEXT,
+    resource_type TEXT,
+    resource_id TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    details TEXT,
+    timestamp TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_event ON audit_logs(event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+
+-- Push subscriptions for web notifications
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
