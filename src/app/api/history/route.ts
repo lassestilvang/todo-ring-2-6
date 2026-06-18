@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { initDb } from '@/db/index';
-import { getTaskHistory, addTaskHistory, toggleTaskStatus } from '@/db/operations';
+import { ensureDbInitialized } from '@/lib/db-init';
+import { getTaskHistory } from '@/db/operations';
 
-try {
-  initDb();
-} catch (e) {}
+// Ensure database is initialized
+ensureDbInitialized();
 
 export async function GET(req: NextRequest) {
   try {
