@@ -2,24 +2,32 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Menu, X, Inbox, Calendar, Clock, ListTodo, Tag, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Plus, Inbox, Calendar, Clock, ListTodo, X, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useSidebar } from '@/hooks/use-sidebar';
 import { useTaskStore } from '@/hooks/use-task-store';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { ThemeSelector } from '@/components/theme-selector';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { ListCreateDialog } from '@/components/list-create-dialog';
+import { LabelCreateDialog } from '@/components/label-create-dialog';
+import { UserProfile } from '@/components/user-profile';
+import type { List, Label } from '@/types/index';
 
 const VIEWS = [
   { id: 'today', name: 'Today', icon: Calendar, shortcut: 'T' },
   { id: 'next7', name: 'Next 7 Days', icon: Clock, shortcut: '7' },
   { id: 'upcoming', name: 'Upcoming', icon: Calendar, shortcut: 'U' },
   { id: 'all', name: 'All Tasks', icon: ListTodo, shortcut: 'A' },
+];
+
+const SPECIAL_VIEWS = [
+  { id: 'analytics', name: 'Analytics', icon: BarChart3, shortcut: 'G' },
 ];
 
 async function fetchLists() {
@@ -39,11 +47,14 @@ async function fetchLabels() {
 export default function Sidebar() {
   const { isOpen, toggle } = useSidebar();
   const [isListDialogOpen, setIsListDialogOpen] = React.useState(false);
-  const { 
-    activeView, 
-    setActiveView, 
-    activeList, 
+  const [isLabelDialogOpen, setIsLabelDialogOpen] = React.useState(false);
+  const {
+    activeView,
+    setActiveView,
+    activeList,
     setActiveList,
+    activeLabel,
+    setActiveLabel,
     searchQuery,
     setSearchQuery,
   } = useTaskStore();
@@ -148,6 +159,35 @@ export default function Sidebar() {
               </nav>
             </div>
 
+            {/* Special Views */}
+            <div>
+              <h4 className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-[0.2em] mb-3 px-3">
+                Insights
+              </h4>
+              <nav className="space-y-1">
+                {SPECIAL_VIEWS.map((view) => (
+                  <button
+                    key={view.id}
+                    onClick={() => {
+                      window.location.href = '/analytics';
+                    }}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-xl transition-all duration-200 group',
+                      'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                    )}
+                  >
+                    <view.icon className="w-4 h-4 text-brand-500" />
+                    <span className="flex-1 text-left">{view.name}</span>
+                    {view.shortcut && (
+                      <kbd className="hidden group-hover:inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-muted/50 text-muted-foreground">
+                        {view.shortcut}
+                      </kbd>
+                    )}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
             {/* Lists */}
             <div>
               <div className="flex items-center justify-between mb-3 px-3">
@@ -164,7 +204,7 @@ export default function Sidebar() {
                 </Button>
               </div>
               <nav className="space-y-1">
-                {lists.map((list: any) => (
+                {lists.map((list: List) => (
                   <button
                     key={list.id}
                     onClick={() => {
@@ -195,18 +235,29 @@ export default function Sidebar() {
                 <h4 className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-[0.2em]">
                   Labels
                 </h4>
-                <Button variant="ghost" size="icon" className="w-5 h-5 rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
+                <Button variant="ghost" size="icon" onClick={() => setIsLabelDialogOpen(true)} className="w-5 h-5 rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
                   <Plus className="w-3 h-3" />
                 </Button>
               </div>
               <nav className="space-y-1">
-                {labels.map((label: any) => (
+                {labels.map((label: Label) => (
                   <button
                     key={label.id}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-xl transition-all duration-200 text-sidebar-foreground/70 hover:bg-sidebar-accent/30 hover:text-sidebar-foreground group"
+                    onClick={() => {
+                      setActiveLabel(label.id);
+                      setActiveView('label');
+                      setActiveList(null);
+                      if (window.innerWidth < 1024) toggle();
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-xl transition-all duration-200 group",
+                      activeLabel === label.id && activeView === 'label'
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border shadow-sm"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/30 hover:text-sidebar-foreground"
+                    )}
                   >
-                    <span 
-                      className="w-2.5 h-2.5 rounded-full ring-2 ring-transparent group-hover:ring-primary/20 transition-all" 
+                    <span
+                      className="w-2.5 h-2.5 rounded-full ring-2 ring-transparent group-hover:ring-primary/20 transition-all"
                       style={{ backgroundColor: label.color }}
                     />
                     <span className="flex-1 text-left truncate">{label.name}</span>
@@ -219,21 +270,83 @@ export default function Sidebar() {
 
         {/* Footer */}
         <div className="p-4 border-t border-sidebar-border/50 bg-sidebar-accent/5">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex flex-col">
               <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Today</span>
               <span className="text-xs font-semibold text-sidebar-foreground">
                 {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
               </span>
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <ThemeSelector />
+              <ThemeToggle />
+            </div>
           </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                const res = await fetch('/api/export');
+                const json = await res.json();
+                if (json.success) {
+                  const data = JSON.stringify(json.data, null, 2);
+                  const blob = new Blob([data], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `tasks-backup-${new Date().toISOString().split('T')[0]}.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }
+              }}
+              className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest hover:text-primary transition-colors"
+              title="Export data"
+            >
+              Export
+            </button>
+            <span className="text-muted-foreground/30">|</span>
+            <label
+              className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest hover:text-primary transition-colors cursor-pointer"
+              title="Import data"
+            >
+              Import
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const text = await file.text();
+                  try {
+                    const data = JSON.parse(text);
+                    await fetch('/api/import', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(data),
+                    });
+                    window.location.reload();
+                  } catch (err) {
+                    toast.error('Invalid file format');
+                  }
+                }}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* User Profile */}
+        <div className="p-4 border-t border-sidebar-border/50">
+          <UserProfile />
         </div>
       </motion.aside>
 
-      <ListCreateDialog 
-        open={isListDialogOpen} 
-        onOpenChange={setIsListDialogOpen} 
+      <ListCreateDialog
+        open={isListDialogOpen}
+        onOpenChange={setIsListDialogOpen}
+      />
+      <LabelCreateDialog
+        open={isLabelDialogOpen}
+        onOpenChange={setIsLabelDialogOpen}
       />
     </>
   );
