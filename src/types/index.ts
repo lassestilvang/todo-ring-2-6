@@ -29,6 +29,7 @@ export const TaskSchema = z.object({
   listId: z.string().nullable().optional(),
   date: z.string().nullable().optional(), // YYYY-MM-DD
   deadline: z.string().nullable().optional(), // YYYY-MM-DD
+  reminderTime: z.string().nullable().optional(), // YYYY-MM-DDTHH:mm:ss
   estimateHours: z.number().default(0),
   estimateMinutes: z.number().default(0),
   actualHours: z.number().default(0),
@@ -38,6 +39,7 @@ export const TaskSchema = z.object({
   recurringType: RecurringType.default('none'),
   recurringInterval: z.string().default(''),
   isAllDay: z.boolean().default(false),
+  isHabit: z.boolean().default(false),
   completedAt: z.string().nullable().optional(),
   sortOrder: z.number().default(0),
   createdAt: z.string(),
@@ -94,6 +96,42 @@ export const AttachmentSchema = z.object({
   createdAt: z.string(),
 });
 
+export const TaskDependencySchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  dependsOnId: z.string(),
+  createdAt: z.string(),
+});
+
+export const TaskShareSchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  userId: z.string(),
+  userName: z.string(),
+  role: z.enum(['viewer', 'editor', 'admin']).default('viewer'),
+  createdAt: z.string(),
+});
+
+export const ListShareSchema = z.object({
+  id: z.string(),
+  listId: z.string(),
+  userId: z.string(),
+  userName: z.string(),
+  role: z.enum(['viewer', 'editor', 'admin']).default('viewer'),
+  createdAt: z.string(),
+});
+
+export const TaskCommentSchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  parentId: z.string().nullable().optional(),
+  userId: z.string(),
+  userName: z.string(),
+  content: z.string(),
+  createdAt: z.string(),
+  replies: z.array(z.any()).optional(),
+});
+
 export type List = z.infer<typeof ListSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type Subtask = z.infer<typeof SubtaskSchema>;
@@ -102,3 +140,7 @@ export type TaskLabel = z.infer<typeof TaskLabelSchema>;
 export type TaskHistory = z.infer<typeof TaskHistorySchema>;
 export type Reminder = z.infer<typeof ReminderSchema>;
 export type Attachment = z.infer<typeof AttachmentSchema>;
+export type TaskDependency = z.infer<typeof TaskDependencySchema>;
+export type TaskShare = z.infer<typeof TaskShareSchema>;
+export type ListShare = z.infer<typeof ListShareSchema>;
+export type TaskComment = z.infer<typeof TaskCommentSchema>;
