@@ -1,2 +1,5 @@
-// Re-export from root db directory
-export { getDb, initDb, closeDb } from '../../db/index.js';
+// Database client re-exports
+export { getDb, initDb, closeDb, injectDb, resetDb } from '../../db/db-client';
+
+// Operations re-exports
+export * from '../../db/operations';
