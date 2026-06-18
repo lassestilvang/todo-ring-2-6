@@ -2,19 +2,19 @@
 
 import * as React from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { Plus, X, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 const EMOJIS = ['📝', '🏠', '💼', '🛒', '🏋️', '📚', '🎨', '✈️', '🎸', '🍎'];
 
@@ -52,7 +52,7 @@ export function ListCreateDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    createMutation.mutate({ name: name.trim(), emoji });
+    createMutation.mutate({ name: name.trim(), emoji: emoji || '📋' });
   };
 
   return (
@@ -113,8 +113,4 @@ export function ListCreateDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
 }
