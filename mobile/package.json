@@ -1,0 +1,33 @@
+{
+  "name": "taskplanner-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npx metro start",
+    "android": "npx react-native run-android",
+    "ios": "npx react-native run-ios",
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-native": "0.73.0",
+    "@react-navigation/native": "^6.1.0",
+    "@react-navigation/native-stack": "^6.9.0",
+    "react-native-paper": "^5.10.0",
+    "@react-native-async-storage/async-storage": "^1.19.0",
+    "react-native-push-notification": "^8.1.1",
+    "react-native-safe-area-context": "^4.7.0",
+    "react-native-screens": "^3.25.0",
+    "react-query": "^3.39.0",
+    "lucide-react-native": "^0.5.0",
+    "expo-checkbox": "^2.4.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.22.0",
+    "@babel/preset-env": "^7.22.0",
+    "@babel/preset-react": "^7.22.0",
+    "@babel/preset-flow": "^7.22.0",
+    "@babel/preset-typescript": "^7.22.0"
+  }
+}
