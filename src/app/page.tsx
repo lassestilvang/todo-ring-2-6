@@ -5,6 +5,24 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
+import { parseNaturalLanguage } from '@/lib/nlp';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   Plus,
   Circle,
@@ -17,37 +35,76 @@ import {
   Loader2,
   ArrowUpDown,
   ListFilter,
+  GripVertical,
+  Clock,
+  LayoutGrid,
+  List as ListIcon,
+  CalendarDays,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { EmptyStateIllustration } from '@/components/empty-state-illustration';
 import { cn } from '@/lib/utils';
+import { getTaskAging } from '@/lib/task-utils';
 import { useTaskStore } from '@/hooks/use-task-store';
 import { TaskDetailDialog } from '@/components/task-detail-dialog';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  listId: string | null;
-  date: string | null;
-  deadline: string | null;
-  priority: 'high' | 'medium' | 'low' | 'none';
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  createdAt: string;
-  updatedAt: string;
-  completedAt: string | null;
-  sortOrder: number;
-}
+import { KanbanBoard } from '@/components/kanban-board';
+import { CalendarView } from '@/components/calendar-view';
+import { GanttChart } from '@/components/gantt-chart';
+import { TaskFilter } from '@/components/task-filter';
+import { TaskTemplates } from '@/components/task-templates';
+import { BulkActions } from '@/components/bulk-actions';
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
+import { OnboardingWelcome } from '@/components/onboarding-welcome';
+import { KeyboardShortcutHelp } from '@/components/keyboard-shortcut-help';
+import { PWAPrompt } from '@/components/pwa-install-prompt';
+import { FocusMode } from '@/components/focus-mode';
+import { QuickStats } from '@/components/quick-stats';
+import type { Task, List } from '@/types/index';
 
 // ─── API Helpers ─────────────────────────────────────────────────────────────
-async function fetchTasks(view: string, listId?: string | null): Promise<Task[]> {
+async function fetchTasks(view: string, listId?: string | null, labelId?: string | null, filters?: {
+  priorities?: ('high' | 'medium' | 'low' | 'none')[];
+  statuses?: ('pending' | 'in_progress' | 'completed' | 'cancelled')[];
+  labels?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  minEstimate?: string;
+  maxEstimate?: string;
+}): Promise<Task[]> {
   const params = new URLSearchParams();
-  if (listId && view === 'list') {
+  if (labelId && view === 'label') {
+    params.set('labelId', labelId);
+  } else if (listId && view === 'list') {
     params.set('listId', listId);
   } else {
     params.set('view', view);
+  }
+  // Add filter parameters
+  if (filters) {
+    if (filters.priorities && filters.priorities.length > 0) {
+      params.set('priorities', filters.priorities.join(','));
+    }
+    if (filters.statuses && filters.statuses.length > 0) {
+      params.set('statuses', filters.statuses.join(','));
+    }
+    if (filters.labels && filters.labels.length > 0) {
+      params.set('labels', filters.labels.join(','));
+    }
+    if (filters.dateFrom) {
+      params.set('dateFrom', filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      params.set('dateTo', filters.dateTo);
+    }
+    if (filters.minEstimate) {
+      params.set('minEstimate', filters.minEstimate);
+    }
+    if (filters.maxEstimate) {
+      params.set('maxEstimate', filters.maxEstimate);
+    }
   }
   const res = await fetch(`/api/tasks?${params.toString()}`);
   const json = await res.json();
@@ -77,23 +134,37 @@ const PRIORITY_CONFIG = {
   none: { label: '', color: 'text-muted-foreground', bg: '', border: '', icon: null },
 } as const;
 
-// ─── Task Card ───────────────────────────────────────────────────────────────
-function TaskCard({
+// ─── Sortable Task Card ────────────────────────────────────────────────────────
+function SortableTaskCard({
   task,
   onToggle,
   onDelete,
-  onUpdate,
   onSelect,
+  isSelected,
+  selectionMode,
 }: {
   task: Task;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onUpdate: (id: string, data: Partial<Task>) => void;
   onSelect: (task: Task) => void;
+  isSelected?: boolean;
+  selectionMode?: boolean;
 }) {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const priority = PRIORITY_CONFIG[task.priority];
   const isOverdue = task.deadline && isPast(parseISO(task.deadline)) && task.status !== 'completed';
+  const aging = getTaskAging(task);
+
+  // Get age indicator
+  const getAgeIndicator = () => {
+    if (aging.ageDays <= 2) return null;
+    if (aging.ageDays <= 7) return { label: 'New', color: 'text-emerald-600' };
+    if (aging.ageDays <= 30) return null;
+    if (aging.ageDays <= 90) return { label: 'Old', color: 'text-amber-600' };
+    return { label: 'Stale', color: 'text-red-600' };
+  };
+
+  const ageIndicator = getAgeIndicator();
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -101,40 +172,74 @@ function TaskCard({
     onDelete(task.id);
   };
 
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   return (
     <motion.div
+      ref={setNodeRef}
+      style={style}
       layout
       initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
       whileHover={{ y: -2 }}
-      onClick={() => onSelect(task)}
+      onClick={() => !selectionMode && onSelect(task)}
       className={cn(
-        'group relative flex items-start gap-4 rounded-xl border bg-card/60 backdrop-blur-sm p-4 transition-all duration-300 cursor-pointer',
+        'group relative flex items-start gap-4 rounded-xl border bg-card/60 backdrop-blur-sm p-4 transition-all duration-300',
+        selectionMode ? 'cursor-pointer' : 'cursor-pointer',
         'hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]',
         'hover:border-primary/20 hover:bg-card',
         task.status === 'completed' ? 'opacity-60 grayscale-[0.5]' : '',
         'border-l-[6px]',
-        priority.border || 'border-l-transparent'
+        priority.border || 'border-l-transparent',
+        isSelected && selectionMode && 'ring-2 ring-primary'
       )}
     >
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggle(task.id); }}
-        className="mt-0.5 flex-shrink-0 transition-all duration-300 hover:scale-110 active:scale-90"
-      >
-        {task.status === 'completed' ? (
-          <div className="relative">
-            <CheckCircle2 className="w-6 h-6 text-emerald-500 fill-emerald-50 dark:fill-emerald-950/30" />
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="absolute inset-0 rounded-full bg-emerald-500/20 -z-10"
-            />
+      <div className="flex items-start gap-3">
+        <button
+          {...attributes}
+          {...listeners}
+          className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="w-4 h-4 text-muted-foreground/50" />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggle(task.id); }}
+          className="mt-0.5 flex-shrink-0 transition-all duration-300 hover:scale-110 active:scale-90"
+        >
+          {task.status === 'completed' ? (
+            <div className="relative">
+              <CheckCircle2 className="w-6 h-6 text-emerald-500 fill-emerald-50 dark:fill-emerald-950/30" />
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute inset-0 rounded-full bg-emerald-500/20 -z-10"
+              />
+            </div>
+          ) : (
+            <Circle className="w-6 h-6 text-muted-foreground/30 hover:text-primary/50 transition-colors" />
+          )}
+        </button>
+      </div>
+
+      {/* Selection checkbox */}
+      {selectionMode && (
+        <div className="flex-shrink-0 mt-0.5">
+          <div className={cn(
+            "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+            isSelected ? "bg-primary border-primary" : "border-muted-foreground/30"
+          )}>
+            {isSelected && <CheckCircle2 className="w-4 h-4 text-primary-foreground" />}
           </div>
-        ) : (
-          <Circle className="w-6 h-6 text-muted-foreground/30 hover:text-primary/50 transition-colors" />
-        )}
-      </button>
+        </div>
+      )}
 
       <div className="flex-1 min-w-0 pt-0.5">
         <h3 className={cn(
@@ -170,6 +275,15 @@ function TaskCard({
                format(parseISO(task.date), 'MMM d')}
             </span>
           )}
+          {task.deadline && (
+            <span className={cn(
+              'inline-flex items-center gap-1.5 text-[12px]',
+              isOverdue ? 'text-red-600 font-semibold' : 'text-muted-foreground/80'
+            )}>
+              <Clock className="w-3.5 h-3.5" />
+              Due {format(parseISO(task.deadline), 'MMM d')}
+            </span>
+          )}
           {isOverdue && (
             <Badge variant="destructive" className="text-[10px] h-5 px-2 rounded-md font-bold uppercase tracking-tighter">
               Overdue
@@ -179,6 +293,11 @@ function TaskCard({
             <span className="text-[11px] text-muted-foreground/60 font-medium italic">
               Done {format(parseISO(task.completedAt), 'MMM d, HH:mm')}
             </span>
+          )}
+          {ageIndicator && (
+            <Badge variant="outline" className={cn("text-[10px] h-5 px-2", ageIndicator.color)}>
+              {ageIndicator.label}
+            </Badge>
           )}
         </div>
       </div>
@@ -394,6 +513,20 @@ function PageHeader({ view, listName }: { view: string; listName?: string }) {
   );
 }
 
+// ─── Quick Stats ─────────────────────────────────────────────────────────────
+function QuickStatsWidget() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="mb-8"
+    >
+      <QuickStats />
+    </motion.div>
+  );
+}
+
 // ─── Empty State ─────────────────────────────────────────────────────────────
 function EmptyState({ view, onAddClick }: { view: string; onAddClick: () => void }) {
   const messages: Record<string, { title: string; desc: string }> = {
@@ -409,9 +542,7 @@ function EmptyState({ view, onAddClick }: { view: string; onAddClick: () => void
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-20 h-20 rounded-3xl bg-muted/50 flex items-center justify-center mb-6 shadow-inner">
-        <Sparkles className="w-10 h-10 text-muted-foreground/20" />
-      </div>
+      <EmptyStateIllustration view={view} className="mb-6" />
       <h3 className="text-xl font-bold text-foreground mb-2">{msg.title}</h3>
       <p className="text-sm text-muted-foreground mb-8 max-w-xs">{msg.desc}</p>
       <Button onClick={onAddClick} size="lg" className="rounded-xl px-8 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all">
@@ -426,17 +557,28 @@ function TaskList({
   tasks,
   onToggle,
   onDelete,
-  onUpdate,
   onSelect,
+  onReorder,
   isLoading,
+  selectedTasks,
+  selectionMode,
 }: {
   tasks: Task[];
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onUpdate: (id: string, data: Partial<Task>) => void;
   onSelect: (task: Task) => void;
+  onReorder: (activeId: string, overId: string) => void;
   isLoading: boolean;
+  selectedTasks: Set<string>;
+  selectionMode: boolean;
 }) {
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -452,44 +594,59 @@ function TaskList({
   const completedTasks = tasks.filter((t) => t.status === 'completed');
 
   return (
-    <div className="space-y-10">
-      <AnimatePresence mode="popLayout">
-        {pendingTasks.length > 0 && (
-          <div className="space-y-3">
-            {pendingTasks.map((task) => (
-              <TaskCard key={task.id} task={task} onToggle={onToggle}
-                onDelete={onDelete} onUpdate={onUpdate} onSelect={onSelect} />
-            ))}
-          </div>
-        )}
-      </AnimatePresence>
-
-      {completedTasks.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
-            <span className="text-[11px] text-muted-foreground font-bold uppercase tracking-[0.2em]">
-              {completedTasks.length} Completed
-            </span>
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
-          </div>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={(event: DragEndEvent) => {
+        const { active, over } = event;
+        if (over && active.id !== over.id) {
+          onReorder(active.id as string, over.id as string);
+        }
+      }}
+    >
+      <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-10">
           <AnimatePresence mode="popLayout">
-            <div className="space-y-3">
-              {completedTasks.map((task) => (
-                <TaskCard key={task.id} task={task} onToggle={onToggle}
-                  onDelete={onDelete} onUpdate={onUpdate} onSelect={onSelect} />
-              ))}
-            </div>
+            {pendingTasks.length > 0 && (
+              <div className="space-y-3">
+                {pendingTasks.map((task) => (
+                  <SortableTaskCard key={task.id} task={task} onToggle={onToggle}
+                    onDelete={onDelete} onSelect={onSelect} isSelected={selectedTasks.has(task.id)}
+                    selectionMode={selectionMode} />
+                ))}
+              </div>
+            )}
           </AnimatePresence>
-        </div>
-      )}
 
-      {pendingTasks.length === 0 && completedTasks.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-sm text-muted-foreground font-medium italic">No tasks found for this view</p>
+          {completedTasks.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
+                <span className="text-[11px] text-muted-foreground font-bold uppercase tracking-[0.2em]">
+                  {completedTasks.length} Completed
+                </span>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
+              </div>
+              <AnimatePresence mode="popLayout">
+                <div className="space-y-3">
+                  {completedTasks.map((task) => (
+                    <SortableTaskCard key={task.id} task={task} onToggle={onToggle}
+                      onDelete={onDelete} onSelect={onSelect} isSelected={selectedTasks.has(task.id)}
+                      selectionMode={selectionMode} />
+                  ))}
+                </div>
+              </AnimatePresence>
+            </div>
+          )}
+
+          {pendingTasks.length === 0 && completedTasks.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-sm text-muted-foreground font-medium italic">No tasks found for this view</p>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </SortableContext>
+    </DndContext>
   );
 }
 
@@ -498,22 +655,67 @@ export default function HomePage() {
   const queryClient = useQueryClient();
   const [selectedTask, setSelectedTask] = React.useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState<'list' | 'kanban' | 'calendar' | 'gantt'>('list');
+  const [filters, setFilters] = React.useState<{
+    priorities: ('high' | 'medium' | 'low' | 'none')[];
+    statuses: ('pending' | 'in_progress' | 'completed' | 'cancelled')[];
+    labels: string[];
+    dateFrom: string;
+    dateTo: string;
+    minEstimate: string;
+    maxEstimate: string;
+  }>({
+    priorities: [],
+    statuses: [],
+    labels: [],
+    dateFrom: '',
+    dateTo: '',
+    minEstimate: '',
+    maxEstimate: '',
+  });
 
   const {
     activeView,
     activeList,
+    activeLabel,
     searchQuery,
+    selectedTasks,
+    isSelectionMode,
+    selectTask,
+    clearSelection,
   } = useTaskStore();
 
+  const selectionMode = isSelectionMode;
+
   const handleSelect = (task: Task) => {
-    setSelectedTask(task);
-    setIsDetailOpen(true);
+    if (selectionMode) {
+      selectTask(task.id);
+    } else {
+      setSelectedTask(task);
+      setIsDetailOpen(true);
+    }
+  };
+
+  const handleClearSelection = () => {
+    clearSelection();
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      priorities: [],
+      statuses: [],
+      labels: [],
+      dateFrom: '',
+      dateTo: '',
+      minEstimate: '',
+      maxEstimate: '',
+    });
   };
 
   // Queries
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ['tasks', activeView, activeList],
-    queryFn: () => fetchTasks(activeView, activeList),
+    queryKey: ['tasks', activeView, activeList, activeLabel, filters],
+    queryFn: () => fetchTasks(activeView, activeList, activeLabel, filters),
   });
 
   const { data: lists = [] } = useQuery({
@@ -523,14 +725,15 @@ export default function HomePage() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: async (title: string) => {
+    mutationFn: async (data: { title: string; listId?: string | null; date?: string | null; priority?: string }) => {
       const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title,
-          listId: activeView === 'list' ? activeList : null,
-          date: activeView === 'today' ? new Date().toISOString().split('T')[0] : null,
+          title: data.title,
+          listId: data.listId ?? (activeView === 'list' ? activeList : null),
+          date: data.date ?? (activeView === 'today' ? new Date().toISOString().split('T')[0] : null),
+          priority: data.priority || 'none',
         }),
       });
       const json = await res.json();
@@ -582,7 +785,7 @@ export default function HomePage() {
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       if (data.status === 'completed') toast('Task completed! 🎉', { icon: '✅' });
     },
-    onError: (err: Error, id, context) => {
+    onError: (err: Error, _id, context) => {
       queryClient.setQueryData(['tasks', activeView, activeList], context?.previousTasks);
       toast.error(err.message);
     },
@@ -611,7 +814,7 @@ export default function HomePage() {
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       toast.success('Task deleted');
     },
-    onError: (err: Error, id, context) => {
+    onError: (err: Error, _id, context) => {
       queryClient.setQueryData(['tasks', activeView, activeList], context?.previousTasks);
       toast.error(err.message);
     },
@@ -620,53 +823,265 @@ export default function HomePage() {
     },
   });
 
-  const handleAdd = (title: string) => createMutation.mutate(title);
-  const handleToggle = (id: string) => toggleMutation.mutate(id);
-  const handleDelete = (id: string) => deleteMutation.mutate(id);
-  const handleUpdate = (id: string, data: Partial<Task>) => {
-    queryClient.setQueryData(['tasks', activeView, activeList], (old: Task[] | undefined) =>
-      old?.map((t) => (t.id === id ? { ...t, ...data } : t))
-    );
+  const handleAdd = (title: string) => {
+    // Try to parse natural language
+    const parsed = parseNaturalLanguage(title);
+    createMutation.mutate({
+      title: parsed.title,
+      date: parsed.date || null,
+      priority: parsed.priority || 'none',
+    });
   };
 
-  // Filter by search
-  const filteredTasks = searchQuery
-    ? tasks.filter((t) =>
+  const handleAddFromTemplate = (task: Partial<{ title: string; description: string; priority: 'high' | 'medium' | 'low' | 'none'; estimateHours: number; estimateMinutes: number; isAllDay: boolean; recurringType: string }>) => {
+    if (!task.title) return;
+    createMutation.mutate({
+      title: task.title,
+      priority: task.priority || 'none',
+    });
+  };
+  const handleToggle = (id: string) => toggleMutation.mutate(id);
+  const handleDelete = (id: string) => deleteMutation.mutate(id);
+
+  // Filter by search and other filters
+  const filteredTasks = React.useMemo(() => {
+    let result = tasks;
+
+    // Search filter
+    if (searchQuery) {
+      result = result.filter((t) =>
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.description?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : tasks;
+      );
+    }
+
+    // Priority filter
+    if (filters.priorities.length > 0) {
+      result = result.filter((t) => filters.priorities.includes(t.priority));
+    }
+
+    // Status filter
+    if (filters.statuses.length > 0) {
+      result = result.filter((t) => filters.statuses.includes(t.status));
+    }
+
+    // Date range filter
+    if (filters.dateFrom || filters.dateTo) {
+      result = result.filter((t) => {
+        if (t.date) {
+          const taskDate = t.date;
+          if (filters.dateFrom && taskDate < filters.dateFrom) return false;
+          if (filters.dateTo && taskDate > filters.dateTo) return false;
+        }
+        return true;
+      });
+    }
+
+    // Time estimate filter
+    if (filters.minEstimate || filters.maxEstimate) {
+      result = result.filter((t) => {
+        const totalMinutes = (t.estimateHours || 0) * 60 + (t.estimateMinutes || 0);
+        const totalHours = totalMinutes / 60;
+        if (filters.minEstimate && totalHours < parseFloat(filters.minEstimate)) return false;
+        if (filters.maxEstimate && totalHours > parseFloat(filters.maxEstimate)) return false;
+        return true;
+      });
+    }
+
+    return result;
+  }, [tasks, searchQuery, filters]);
+
+  // Reorder mutation
+  const reorderMutation = useMutation({
+    mutationFn: async ({ activeId, newPosition }: { activeId: string; newPosition: number }) => {
+      await fetch(`/api/tasks/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: activeId,
+          newPosition,
+        }),
+      });
+      return { success: true };
+    },
+    onError: (err: Error) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', activeView, activeList] });
+      toast.error(err.message);
+    },
+  });
+
+  const handleReorder = (activeId: string, overId: string) => {
+    const activeIndex = filteredTasks.findIndex(t => t.id === activeId);
+    const overIndex = filteredTasks.findIndex(t => t.id === overId);
+
+    if (activeIndex === -1 || overIndex === -1) return;
+
+    const newTasks = arrayMove([...filteredTasks], activeIndex, overIndex);
+    queryClient.setQueryData(['tasks', activeView, activeList], newTasks);
+
+    reorderMutation.mutate({ activeId, newPosition: overIndex });
+  };
 
   const listName = activeList
-    ? lists.find((l: any) => l.id === activeList)?.name
+    ? lists.find((l: List) => l.id === activeList)?.name
     : undefined;
+
+  // Keyboard shortcuts
+  const [isHelpOpen, setIsHelpOpen] = React.useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = React.useState(false);
+  const [isPWAOpen, setIsPWAOpen] = React.useState(false);
+
+  useKeyboardShortcuts({
+    onNewTask: () => document.querySelector('input')?.focus(),
+    onSearch: () => document.querySelector('input')?.focus(),
+    onToggleView: () => setViewMode(v => v === 'list' ? 'kanban' : 'list'),
+    onViewChange: (view) => setViewMode(view),
+    onShowHelp: () => setIsHelpOpen(true),
+    onDismiss: () => {
+      setIsDetailOpen(false);
+      setIsHelpOpen(false);
+    },
+  });
+
+  // Check for onboarding
+  React.useEffect(() => {
+    const completed = localStorage.getItem('taskplanner-onboarding-completed');
+    if (!completed) {
+      setIsOnboardingOpen(true);
+    }
+  }, []);
+
+  // Check for PWA install
+  React.useEffect(() => {
+    const deferredPrompt = (window as any).__taskplannerDeferredPrompt;
+    if (deferredPrompt) {
+      setIsPWAOpen(true);
+    }
+  }, []);
 
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="max-w-3xl mx-auto">
+        <div className={cn(
+          "mx-auto",
+          viewMode === 'kanban' ? 'max-w-[1600px]' : 'max-w-3xl'
+        )}>
           <PageHeader view={activeView} listName={listName} />
-          <div className="space-y-10">
-            <QuickAdd onAdd={handleAdd} />
-            {filteredTasks.length === 0 && !isLoading ? (
-              <EmptyState view={activeView} onAddClick={() => document.querySelector('input')?.focus()} />
-            ) : (
-              <TaskList
-                tasks={filteredTasks}
-                onToggle={handleToggle}
-                onDelete={handleDelete}
-                onUpdate={handleUpdate}
-                onSelect={handleSelect}
-                isLoading={isLoading}
+          {viewMode === 'list' && <QuickStatsWidget />}
+
+          {/* View Toggle and Filters */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center rounded-xl bg-muted/50 p-1">
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="h-7 px-3 rounded-lg"
+                >
+                  <ListIcon className="w-3.5 h-3.5 mr-1.5" />
+                  List
+                </Button>
+                <Button
+                  variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('kanban')}
+                  className="h-7 px-3 rounded-lg"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5 mr-1.5" />
+                  Board
+                </Button>
+                <Button
+                  variant={viewMode === 'calendar' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('calendar')}
+                  className="h-7 px-3 rounded-lg"
+                >
+                  <CalendarDays className="w-3.5 h-3.5 mr-1.5" />
+                  Calendar
+                </Button>
+                <Button
+                  variant={viewMode === 'gantt' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('gantt')}
+                  className="h-7 px-3 rounded-lg"
+                >
+                  <BarChart3 className="w-3.5 h-3.5 mr-1.5" />
+                  Gantt
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <TaskTemplates onCreateTask={handleAddFromTemplate} />
+              <TaskFilter
+                filters={filters}
+                onFiltersChange={setFilters}
+                onClear={handleClearFilters}
               />
+            </div>
+          </div>
+
+          <div className="space-y-10">
+            {viewMode === 'kanban' ? (
+              <KanbanBoard
+                onTaskSelect={setSelectedTask}
+              />
+            ) : viewMode === 'calendar' ? (
+              <CalendarView onTaskSelect={setSelectedTask} />
+            ) : viewMode === 'gantt' ? (
+              <GanttChart tasks={filteredTasks} onTaskSelect={setSelectedTask} />
+            ) : (
+              <>
+                <QuickAdd onAdd={handleAdd} />
+                {filteredTasks.length === 0 && !isLoading ? (
+                  <EmptyState view={activeView} onAddClick={() => document.querySelector('input')?.focus()} />
+                ) : (
+                  <>
+                    {selectedTasks.size > 0 && (
+                      <div className="mb-4 p-4 rounded-xl bg-muted/50 flex items-center justify-between">
+                        <span className="font-medium">{selectedTasks.size} tasks selected</span>
+                        <div className="flex gap-2">
+                          <BulkActions selectedIds={selectedTasks} onClearSelection={handleClearSelection} />
+                        </div>
+                      </div>
+                    )}
+                    <TaskList
+                      tasks={filteredTasks}
+                      onToggle={handleToggle}
+                      onDelete={handleDelete}
+                      onSelect={handleSelect}
+                      onReorder={handleReorder}
+                      isLoading={isLoading}
+                      selectedTasks={selectedTasks}
+                      selectionMode={selectionMode}
+                    />
+                  </>
+                )}
+              </>
             )}
           </div>
         </div>
       </div>
-      <TaskDetailDialog 
-        task={selectedTask} 
-        open={isDetailOpen} 
-        onOpenChange={setIsDetailOpen} 
+      <TaskDetailDialog
+        task={selectedTask}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+      />
+      <OnboardingWelcome
+        open={isOnboardingOpen}
+        onComplete={() => setIsOnboardingOpen(false)}
+      />
+      <KeyboardShortcutHelp
+        open={isHelpOpen}
+        onOpenChange={setIsHelpOpen}
+      />
+      <PWAPrompt
+        open={isPWAOpen}
+        onOpenChange={setIsPWAOpen}
+      />
+      <FocusMode
+        task={selectedTask ?? undefined}
+        onClose={() => setIsDetailOpen(false)}
       />
     </div>
   );
