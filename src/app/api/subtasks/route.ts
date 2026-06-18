@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { initDb } from '@/db/index';
+import { ensureDbInitialized } from '@/lib/db-init';
 import {
   getSubtasks,
   createSubtask,
-  toggleSubtask,
+  toggleSubtask as toggleSubtaskStatus,
   deleteSubtask,
 } from '@/db/operations';
+import { SubtaskSchema } from '@/lib/validations';
 
-try {
-  initDb();
-} catch (e) {}
+// Ensure database is initialized
+ensureDbInitialized();
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,7 +28,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const newSubtask = createSubtask(body);
+    const validated = SubtaskSchema.safeParse(body);
+    if (!validated.success) {
+      return NextResponse.json(
+        { success: false, error: validated.error.errors.map(e => e.message).join(', ') },
+        { status: 400 }
+      );
+    }
+    const newSubtask = createSubtask(validated.data);
     return NextResponse.json({ success: true, data: newSubtask }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message || 'Failed to create subtask' }, { status: 500 });
@@ -42,7 +49,7 @@ export async function PUT(req: NextRequest) {
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
     }
-    const updatedSubtask = toggleSubtask(id);
+    const updatedSubtask = toggleSubtaskStatus(id);
     return NextResponse.json({ success: true, data: updatedSubtask });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message || 'Failed to update subtask' }, { status: 500 });
