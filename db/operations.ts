@@ -2,6 +2,9 @@ import { getDb } from './db-client';
 import type { List, Task, Subtask, Label, TaskHistory, TaskDependency, TaskShare, ListShare, TaskComment, Reminder } from '../src/types/index';
 import { addDays, addMonths, addYears, isAfter, parseISO } from 'date-fns';
 
+// Re-export getDb for convenience
+export { getDb };
+
 // === List Operations ===
 
 export function getAllLists(): List[] {
@@ -959,7 +962,7 @@ export function deleteAttachment(id: string): void {
 
 // === Push Subscription Operations ===
 
-export interface PushSubscription {
+export interface PushSubscriptionData {
   id: string;
   userId: string;
   endpoint: string;
@@ -967,6 +970,8 @@ export interface PushSubscription {
   auth: string;
   createdAt: string;
 }
+
+export type PushSubscription = PushSubscriptionData;
 
 export function getPushSubscription(id: string): PushSubscription | undefined {
   const db = getDb();
@@ -1143,4 +1148,497 @@ export function updateUser(id: string, data: Partial<{ name: string; email: stri
 export function deleteUser(id: string): void {
   const db = getDb();
   db.prepare('DELETE FROM users WHERE id = ?').run(id);
+}
+
+// === MFA Operations ===
+
+export interface MfaSecret {
+  id: string;
+  userId: string;
+  secret: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function getMfaSecret(userId: string): MfaSecret | undefined {
+  const db = getDb();
+  return db.prepare('SELECT * FROM mfa_secrets WHERE user_id = ?').get(userId) as MfaSecret | undefined;
+}
+
+export function createMfaSecret(userId: string, secret: string): MfaSecret {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  db.prepare(
+    'INSERT INTO mfa_secrets (id, user_id, secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+  ).run(id, userId, secret, now, now);
+
+  return db.prepare('SELECT * FROM mfa_secrets WHERE id = ?').get(id) as MfaSecret;
+}
+
+export function deleteMfaSecret(userId: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM mfa_secrets WHERE user_id = ?').run(userId);
+}
+
+export function verifyTotp(secret: string, token: string): boolean {
+  // This is a simplified version - in production use speakeasy or similar
+  const crypto = require('crypto');
+  const time = Math.floor(Date.now() / 1000 / 30);
+
+  for (let i = -1; i <= 1; i++) {
+    const counter = time + i;
+    const buffer = Buffer.alloc(8);
+    buffer.writeUInt32BE(0, 0);
+    buffer.writeUInt32BE(counter, 4);
+
+    const hmac = crypto.createHmac('sha1', Buffer.from(secret, 'hex'));
+    hmac.update(buffer);
+    const hash = hmac.digest();
+
+    const offset = hash[hash.length - 1] & 0xf;
+    const code = ((hash[offset] & 0x7f) << 24 |
+                  (hash[offset + 1] & 0xff) << 16 |
+                  (hash[offset + 2] & 0xff) << 8 |
+                  (hash[offset + 3] & 0xff)) % 1000000;
+
+    if (code.toString().padStart(6, '0') === token) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// === Session Operations ===
+
+export interface Session {
+  id: string;
+  userId: string;
+  ipAddress?: string;
+  userAgent?: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export function createSession(data: { userId: string; ipAddress?: string; userAgent?: string }): Session {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  db.prepare(
+    'INSERT INTO sessions (id, user_id, ip_address, user_agent, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(id, data.userId, data.ipAddress || null, data.userAgent || null, expiresAt, now);
+
+  return db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as Session;
+}
+
+export function getSession(id: string): Session | undefined {
+  const db = getDb();
+  return db.prepare('SELECT * FROM sessions WHERE id = ? AND expires_at > ?')
+    .get(id, new Date().toISOString()) as Session | undefined;
+}
+
+export function deleteSession(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+}
+
+export function deleteAllUserSessions(userId: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM refresh_tokens WHERE user_id = ?').run(userId);
+}
+
+// === Refresh Token Operations ===
+
+export interface RefreshToken {
+  id: string;
+  userId: string;
+  token: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export function createRefreshToken(userId: string): RefreshToken {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const token = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  db.prepare(
+    'INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).run(id, userId, token, expiresAt, now);
+
+  return db.prepare('SELECT * FROM refresh_tokens WHERE id = ?').get(id) as RefreshToken;
+}
+
+export function getRefreshToken(token: string): RefreshToken | undefined {
+  const db = getDb();
+  return db.prepare('SELECT * FROM refresh_tokens WHERE token = ? AND expires_at > ?')
+    .get(token, new Date().toISOString()) as RefreshToken | undefined;
+}
+
+export function deleteRefreshToken(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM refresh_tokens WHERE id = ?').run(id);
+}
+
+// === Password Reset Token Operations ===
+
+export interface PasswordResetToken {
+  id: string;
+  userId: string;
+  token: string;
+  expiresAt: string;
+  used: boolean;
+  createdAt: string;
+}
+
+export function createPasswordResetToken(userId: string): PasswordResetToken {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const token = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  db.prepare(
+    'INSERT INTO password_reset_tokens (id, user_id, token, expires_at, used, created_at) VALUES (?, ?, ?, ?, 0, ?)'
+  ).run(id, userId, token, expiresAt, now);
+
+  return db.prepare('SELECT * FROM password_reset_tokens WHERE id = ?').get(id) as PasswordResetToken;
+}
+
+export function getPasswordResetToken(token: string): PasswordResetToken | undefined {
+  const db = getDb();
+  return db.prepare('SELECT * FROM password_reset_tokens WHERE token = ?')
+    .get(token) as PasswordResetToken | undefined;
+}
+
+export function markPasswordResetTokenUsed(id: string): void {
+  const db = getDb();
+  db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').run(id);
+}
+
+// === Theme Operations ===
+
+export interface Theme {
+  id: string;
+  name: string;
+  colors: Record<string, string>;
+  emoji: string;
+  isCustom: boolean;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function createTheme(data: { name: string; colors: Record<string, string>; emoji?: string; createdBy?: string }): Theme {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  db.prepare(
+    'INSERT INTO themes (id, name, colors, emoji, is_custom, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?)'
+  ).run(id, data.name, JSON.stringify(data.colors), data.emoji || '🎨', data.createdBy || null, now, now);
+
+  return db.prepare('SELECT * FROM themes WHERE id = ?').get(id) as Theme;
+}
+
+export function getThemes(): Theme[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM themes ORDER BY created_at DESC').all() as Theme[];
+}
+
+export function getThemeById(id: string): Theme | undefined {
+  const db = getDb();
+  return db.prepare('SELECT * FROM themes WHERE id = ?').get(id) as Theme | undefined;
+}
+
+// === Goal Operations ===
+
+import type { Goal } from '../src/types/index.js';
+
+export function getAllGoals(): Goal[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM goals ORDER BY created_at DESC').all() as Goal[];
+}
+
+export function getGoalsByPeriod(period: 'daily' | 'weekly' | 'monthly' | 'yearly'): Goal[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM goals WHERE period = ? ORDER BY created_at DESC').all(period) as Goal[];
+}
+
+export function getGoalById(id: string): Goal | undefined {
+  const db = getDb();
+  return db.prepare('SELECT * FROM goals WHERE id = ?').get(id) as Goal | undefined;
+}
+
+export function createGoal(data: {
+  userId: string;
+  title: string;
+  description?: string;
+  targetValue: number;
+  unit?: string;
+  period?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  category?: string;
+  color?: string;
+  startDate: string;
+  endDate: string;
+}): Goal {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `INSERT INTO goals (id, user_id, title, description, target_value, unit, period, category, color, current_value, is_completed, start_date, end_date, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?)`
+  ).run(
+    id,
+    data.userId,
+    data.title,
+    data.description || '',
+    data.targetValue,
+    data.unit || 'tasks',
+    data.period || 'weekly',
+    data.category || 'general',
+    data.color || '#3b82f6',
+    data.startDate,
+    data.endDate,
+    now,
+    now
+  );
+
+  return db.prepare('SELECT * FROM goals WHERE id = ?').get(id) as Goal;
+}
+
+export function updateGoalProgress(id: string, increment: number): Goal {
+  const db = getDb();
+  const goal = getGoalById(id);
+  if (!goal) throw new Error('Goal not found');
+
+  const newValue = Math.min(Math.max(goal.currentValue + increment, 0), goal.targetValue);
+  const now = new Date().toISOString();
+  const isCompleted = newValue >= goal.targetValue;
+
+  db.prepare(
+    'UPDATE goals SET current_value = ?, is_completed = ?, updated_at = ? WHERE id = ?'
+  ).run(newValue, isCompleted ? 1 : 0, now, id);
+
+  return db.prepare('SELECT * FROM goals WHERE id = ?').get(id) as Goal;
+}
+
+export function updateGoal(id: string, data: Partial<{
+  title: string;
+  description: string;
+  targetValue: number;
+  unit: string;
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  category: string;
+  color: string;
+  startDate: string;
+  endDate: string;
+}>): Goal {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const goal = getGoalById(id);
+  if (!goal) throw new Error('Goal not found');
+
+  const updates: string[] = [];
+  const values: (string | number)[] = [];
+
+  if (data.title !== undefined) { updates.push('title = ?'); values.push(data.title); }
+  if (data.description !== undefined) { updates.push('description = ?'); values.push(data.description); }
+  if (data.targetValue !== undefined) { updates.push('target_value = ?'); values.push(data.targetValue); }
+  if (data.unit !== undefined) { updates.push('unit = ?'); values.push(data.unit); }
+  if (data.period !== undefined) { updates.push('period = ?'); values.push(data.period); }
+  if (data.category !== undefined) { updates.push('category = ?'); values.push(data.category); }
+  if (data.color !== undefined) { updates.push('color = ?'); values.push(data.color); }
+  if (data.startDate !== undefined) { updates.push('start_date = ?'); values.push(data.startDate); }
+  if (data.endDate !== undefined) { updates.push('end_date = ?'); values.push(data.endDate); }
+  updates.push('updated_at = ?'); values.push(now);
+  values.push(id);
+
+  db.prepare(`UPDATE goals SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  return db.prepare('SELECT * FROM goals WHERE id = ?').get(id) as Goal;
+}
+
+export function deleteGoal(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM goals WHERE id = ?').run(id);
+}
+
+export function getActiveGoalsByPeriod(period: 'daily' | 'weekly' | 'monthly' | 'yearly', userId?: string): Goal[] {
+  const db = getDb();
+  const now = new Date().toISOString().split('T')[0];
+  if (!now) return [];
+
+  let query = 'SELECT * FROM goals WHERE period = ? AND start_date <= ? AND end_date >= ?';
+  const values: (string | number)[] = [period, now, now];
+
+  if (userId) {
+    query += ' AND user_id = ?';
+    values.push(userId);
+  }
+
+  query += ' ORDER BY created_at DESC';
+  return db.prepare(query).all(...values) as Goal[];
+}
+
+export function getGoalProgress(id: string): { current: number; target: number; percentage: number; isCompleted: boolean } {
+  const goal = getGoalById(id);
+  if (!goal) throw new Error('Goal not found');
+
+  const percentage = Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100));
+  return {
+    current: goal.currentValue,
+    target: goal.targetValue,
+    percentage,
+    isCompleted: Boolean(goal.isCompleted),
+  };
+}
+
+// === Template Marketplace Operations ===
+
+import type { TaskTemplate } from '../src/types/index.js';
+
+interface TemplateRating {
+  id: string;
+  templateId: string;
+  rating: number;
+  createdAt: string;
+}
+
+export function getTemplates(category?: string | undefined, sortBy: string = 'usage_count', limit: number = 20): TaskTemplate[] {
+  const db = getDb();
+  let query = 'SELECT * FROM task_templates WHERE 1=1';
+  const values: (string | number)[] = [];
+
+  if (category) {
+    query += ' AND category = ?';
+    values.push(category);
+  }
+
+  // Sanitize sortBy to prevent SQL injection
+  const validSortColumns = ['usage_count', 'avg_rating', 'created_at', 'name'];
+  const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'usage_count';
+  query += ` ORDER BY ${sortColumn} DESC LIMIT ?`;
+  values.push(limit);
+
+  return db.prepare(query).all(...values) as TaskTemplate[];
+}
+
+export function getTemplateRatings(templateId: string): TemplateRating[] {
+  const db = getDb();
+  return db.prepare(
+    'SELECT * FROM template_ratings WHERE template_id = ? ORDER BY created_at DESC'
+  ).all(templateId) as TemplateRating[];
+}
+
+export function rateTemplate(templateId: string, rating: number): TemplateRating {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  db.prepare(
+    'INSERT INTO template_ratings (id, template_id, rating, created_at) VALUES (?, ?, ?, ?)'
+  ).run(id, templateId, rating, now);
+
+  // Update usage count
+  db.prepare(
+    'UPDATE task_templates SET usage_count = usage_count + 1 WHERE id = ?'
+  ).run(templateId);
+
+  return db.prepare('SELECT * FROM template_ratings WHERE id = ?').get(id) as TemplateRating;
+}
+
+export function getTemplateById(id: string): TaskTemplate | undefined {
+  const db = getDb();
+  return db.prepare('SELECT * FROM task_templates WHERE id = ?').get(id) as TaskTemplate | undefined;
+}
+
+export function createTemplate(data: {
+  name: string;
+  icon?: string;
+  title: string;
+  description?: string;
+  priority?: 'high' | 'medium' | 'low' | 'none';
+  estimateHours?: number;
+  estimateMinutes?: number;
+  isAllDay?: boolean;
+  recurringType?: string;
+  labelIds?: string[];
+  category?: string;
+  createdBy?: string;
+}): TaskTemplate {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO task_templates
+    (id, name, icon, title, description, priority, estimate_hours, estimate_minutes,
+     is_all_day, recurring_type, recurring_interval, label_ids, category, created_by,
+     created_at, updated_at, usage_count, avg_rating)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+  `).run(
+    id, data.name, data.icon || '📋', data.title, data.description || '',
+    data.priority || 'none', data.estimateHours || 0, data.estimateMinutes || 0,
+    data.isAllDay ? 1 : 0, data.recurringType || 'none', '',
+    JSON.stringify(data.labelIds || []), data.category || 'general',
+    data.createdBy || null, now, now
+  );
+
+  return db.prepare('SELECT * FROM task_templates WHERE id = ?').get(id) as TaskTemplate;
+}
+
+// === Custom Fields Operations ===
+
+import type { CustomField } from '../src/types/index.js';
+
+export interface CustomFieldData {
+  id?: string;
+  taskId: string;
+  fieldKey: string;
+  fieldType: 'text' | 'number' | 'date' | 'select' | 'checkbox' | 'textarea';
+  fieldValue?: string;
+  label: string;
+}
+
+export function getCustomFields(taskId: string): CustomField[] {
+  const db = getDb();
+  return db.prepare(
+    'SELECT * FROM custom_fields WHERE task_id = ? ORDER BY field_key'
+  ).all(taskId) as CustomField[];
+}
+
+export function createCustomField(data: CustomFieldData): CustomField {
+  const db = getDb();
+  const id = data.id || crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  db.prepare(
+    'INSERT INTO custom_fields (id, task_id, field_key, field_type, field_value, label, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, data.taskId, data.fieldKey, data.fieldType, data.fieldValue || '', data.label, now);
+
+  return db.prepare('SELECT * FROM custom_fields WHERE id = ?').get(id) as CustomField;
+}
+
+export function updateCustomField(id: string, fieldValue: string): CustomField {
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  db.prepare(
+    'UPDATE custom_fields SET field_value = ?, updated_at = ? WHERE id = ?'
+  ).run(fieldValue, now, id);
+
+  return db.prepare('SELECT * FROM custom_fields WHERE id = ?').get(id) as CustomField;
+}
+
+export function deleteCustomField(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM custom_fields WHERE id = ?').run(id);
 }
