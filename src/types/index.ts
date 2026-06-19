@@ -44,6 +44,8 @@ export const TaskSchema = z.object({
   sortOrder: z.number().default(0),
   createdAt: z.string(),
   updatedAt: z.string(),
+  assigneeId: z.string().nullable().optional(), // User ID of assignee
+  assigneeName: z.string().nullable().optional(), // Denormalized for display
 });
 
 export const SubtaskSchema = z.object({
@@ -132,6 +134,55 @@ export const TaskCommentSchema = z.object({
   replies: z.array(z.any()).optional(),
 });
 
+export const TaskTemplateSchema = z.object({
+  id: z.string(),
+  title: z.string().min(1).max(100),
+  description: z.string().default(''),
+  priority: Priority.default('none'),
+  estimateHours: z.number().default(0),
+  estimateMinutes: z.number().default(0),
+  isAllDay: z.boolean().default(false),
+  recurringType: RecurringType.default('none'),
+  tags: z.array(z.string()).default([]),
+  isPublic: z.boolean().default(false),
+  downloadCount: z.number().default(0),
+  rating: z.number().default(0),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// PushSubscription is defined in db/operations.ts as an interface
+// This is just for API type safety
+export interface PushSubscription {
+  id: string;
+  userId: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  createdAt: string;
+}
+
+export const GoalPeriod = z.enum(['daily', 'weekly', 'monthly', 'yearly']);
+export type GoalPeriod = z.infer<typeof GoalPeriod>;
+
+export const GoalSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  title: z.string().min(1).max(100),
+  description: z.string().default(''),
+  targetValue: z.number().min(1),
+  unit: z.string().default('tasks'),
+  period: GoalPeriod.default('weekly'),
+  category: z.string().default('general'),
+  color: z.string().default('#3b82f6'),
+  currentValue: z.number().default(0),
+  isCompleted: z.boolean().default(false),
+  startDate: z.string(),
+  endDate: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 export type List = z.infer<typeof ListSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type Subtask = z.infer<typeof SubtaskSchema>;
@@ -143,4 +194,7 @@ export type Attachment = z.infer<typeof AttachmentSchema>;
 export type TaskDependency = z.infer<typeof TaskDependencySchema>;
 export type TaskShare = z.infer<typeof TaskShareSchema>;
 export type ListShare = z.infer<typeof ListShareSchema>;
+export type Goal = z.infer<typeof GoalSchema>;
 export type TaskComment = z.infer<typeof TaskCommentSchema>;
+export type TaskTemplate = z.infer<typeof TaskTemplateSchema>;
+export type CustomField = z.infer<typeof CustomFieldSchema>;
