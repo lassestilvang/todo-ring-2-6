@@ -1,0 +1,62 @@
+{
+  "name": "TaskPlanner - Daily Task Manager",
+  "short_name": "TaskPlanner",
+  "description": "A modern, professional daily task planner with Kanban boards, templates, analytics, and real-time collaboration",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/home-light.png",
+      "sizes": "1240x720",
+      "type": "image/png",
+      "form_factor": "phone",
+      "label": "Home screen"
+    },
+    {
+      "src": "/screenshots/home-dark.png",
+      "sizes": "1240x720",
+      "type": "image/png",
+      "form_factor": "phone",
+      "label": "Home screen dark mode"
+    },
+    {
+      "src": "/screenshots/task-detail.png",
+      "sizes": "1240x720",
+      "type": "image/png",
+      "form_factor": "phone",
+      "label": "Task details"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "prefer_related_applications": false,
+  "protocol_handlers": [],
+  "file_handlers": [],
+  "window_controls": {
+    "max_width": 1200
+  }
+}
