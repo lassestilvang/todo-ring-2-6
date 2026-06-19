@@ -9,42 +9,6 @@
 
 import { getUpcomingReminders, updateReminder, getTaskById } from '../db/operations';
 import { sendEmail, generateReminderEmail, generateReminderText } from '../src/lib/email';
-import webPush from 'web-push';
-
-// Configure web-push
-webPush.setVapidDetails(
-  'TaskPlanner',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '',
-  process.env.VAPID_PRIVATE_KEY || ''
-);
-
-interface PushSubscription {
-  id: string;
-  userId: string;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-  createdAt: string;
-}
-
-async function sendPushNotification(subscription: PushSubscription, payload: any): Promise<boolean> {
-  try {
-    await webPush.sendNotification(subscription.endpoint, JSON.stringify(payload), {
-      vapid: {
-        subject: 'TaskPlanner <noreply@taskplanner.app>',
-        privateKey: process.env.VAPID_PRIVATE_KEY || '',
-      },
-      keys: {
-        p256dh: subscription.p256dh,
-        auth: subscription.auth,
-      },
-    });
-    return true;
-  } catch (error) {
-    console.error('Failed to send push notification:', error);
-    return false;
-  }
-}
 
 async function sendNotification(reminder: {
   id: string;
