@@ -3,6 +3,7 @@ import { ensureDbInitialized } from '@/lib/db-init';
 import { getTasks, getTaskStats, getOverdueCount } from '@/db/operations';
 import { jsonSuccess, jsonError } from '@/lib/api-response';
 import { format } from 'date-fns';
+import type { Task } from '@/types/index';
 
 // Ensure database is initialized
 ensureDbInitialized();
@@ -30,19 +31,19 @@ export async function GET(req: NextRequest) {
       tasks: tasks.map(t => ({
         id: t.id,
         title: t.title,
-        description: t.description,
+        description: t.description || '',
         status: t.status,
         priority: t.priority,
-        listId: t.listId,
-        date: t.date,
-        deadline: t.deadline,
-        createdAt: t.createdAt,
-        completedAt: t.completedAt,
-        estimateHours: t.estimateHours,
-        estimateMinutes: t.estimateMinutes,
-        actualHours: t.actualHours,
-        actualMinutes: t.actualMinutes,
-      })),
+        listId: t.listId ?? undefined,
+        date: t.date ?? undefined,
+        deadline: t.deadline ?? undefined,
+        createdAt: t.createdAt ?? undefined,
+        completedAt: t.completedAt ?? undefined,
+        estimateHours: t.estimateHours ?? 0,
+        estimateMinutes: t.estimateMinutes ?? 0,
+        actualHours: t.actualHours ?? 0,
+        actualMinutes: t.actualMinutes ?? 0,
+      } as Task)),
     };
 
     if (format_ === 'csv') {
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-function generateCSV(tasks: any[]): string {
+function generateCSV(tasks: Task[]): string {
   const headers = ['ID', 'Title', 'Description', 'Status', 'Priority', 'List ID', 'Date', 'Deadline', 'Created At', 'Completed At'];
   const rows = tasks.map(t => [
     t.id,
@@ -100,7 +101,7 @@ function generateCSV(tasks: any[]): string {
   return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
 }
 
-function generateMarkdown(data: any): string {
+function generateMarkdown(data: { summary: any; tasks: Task[] }): string {
   return `# TaskPlanner Analytics Report
 
 Generated: ${data.summary.generatedAt}
@@ -118,7 +119,7 @@ Generated: ${data.summary.generatedAt}
 
 ## Tasks
 
-${data.tasks.map((t: any) => `### ${t.title}
+${data.tasks.map((t: Task) => `### ${t.title}
 
 - **Status**: ${t.status}
 - **Priority**: ${t.priority}
@@ -131,7 +132,7 @@ ${data.tasks.map((t: any) => `### ${t.title}
 `;
 }
 
-function generatePrintableHTML(data: any): string {
+function generatePrintableHTML(data: { summary: any; tasks: Task[] }): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -165,7 +166,7 @@ function generatePrintableHTML(data: any): string {
   <h2>Tasks</h2>
   <table>
     <tr><th>Title</th><th>Status</th><th>Priority</th><th>Date</th><th>Deadline</th></tr>
-    ${data.tasks.map((t: any) => `<tr><td>${t.title}</td><td>${t.status}</td><td>${t.priority}</td><td>${t.date || 'N/A'}</td><td>${t.deadline || 'N/A'}</td></tr>`).join('')}
+    ${data.tasks.map((t: Task) => `<tr><td>${t.title}</td><td>${t.status}</td><td>${t.priority}</td><td>${t.date || 'N/A'}</td><td>${t.deadline || 'N/A'}</td></tr>`).join('')}
   </table>
 </body>
 </html>`;
