@@ -10,7 +10,7 @@
  */
 
 import { getUpcomingReminders, updateReminder, getTaskById, getPushSubscriptionsForUser } from '../db/operations';
-import { sendEmail, generateReminderEmail, generateReminderText, isEmailConfigured } from '../lib/email';
+import { sendEmail, generateReminderEmail, generateReminderText, isEmailConfigured } from '../src/lib/email';
 import webPush from 'web-push';
 
 // Configure web-push
@@ -20,7 +20,7 @@ webPush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY || ''
 );
 
-interface PushSubscription {
+interface PushSubscriptionData {
   id: string;
   userId: string;
   endpoint: string;
@@ -29,7 +29,7 @@ interface PushSubscription {
   createdAt: string;
 }
 
-async function sendPushNotification(subscription: PushSubscription, payload: any): Promise<boolean> {
+async function sendPushNotification(subscription: PushSubscriptionData, payload: any): Promise<boolean> {
   try {
     await webPush.sendNotification(
       subscription.endpoint,
@@ -130,7 +130,7 @@ async function processReminders() {
             ],
           };
 
-          if (await sendPushNotification(sub as PushSubscription, payload)) {
+          if (await sendPushNotification(sub as PushSubscriptionData, payload)) {
             pushSent = true;
           }
         }
