@@ -8,7 +8,7 @@
     ],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
@@ -26,6 +26,15 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@/db": [
+        "./db/*"
+      ],
+      "@/db/db-client": [
+        "./db/db-client.ts"
+      ],
+      "@/lib": [
+        "./src/lib/*"
       ]
     },
     "allowJs": true,
