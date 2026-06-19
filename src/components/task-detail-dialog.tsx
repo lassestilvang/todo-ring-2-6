@@ -28,6 +28,7 @@ import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog';
+import { UserPlus, UserMinus } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { TaskComments } from '@/components/task-comments';
@@ -601,6 +602,53 @@ export function TaskDetailDialog({
                     );
                   })}
                 </div>
+              </div>
+            </section>
+
+            {/* Assignee */}
+            <section>
+              <div className="flex items-center gap-2 text-muted-foreground mb-4">
+                <UserPlus className="w-4 h-4" />
+                <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Assignee</h4>
+              </div>
+              <div className="space-y-3">
+                {task.assigneeId ? (
+                  <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 rounded-xl">
+                    <div className="w-10 h-10 rounded-full bg-brand-500/20 flex items-center justify-center">
+                      <span className="font-bold text-brand-500">{task.assigneeName?.[0] || '?'}</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold">{task.assigneeName}</p>
+                      <p className="text-sm text-muted-foreground">Assigned</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updateMutation.mutate({ assigneeId: null, assigneeName: null })}
+                      className="h-8 w-8 p-0"
+                    >
+                      <UserMinus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      // In a real app, this would open a user selector modal
+                      const name = prompt('Enter assignee name:');
+                      if (name) {
+                        updateMutation.mutate({
+                          assigneeId: `user-${Date.now()}`, // Temporary ID for demo
+                          assigneeName: name
+                        });
+                      }
+                    }}
+                    className="w-full justify-start"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Assign to someone...
+                  </Button>
+                )}
               </div>
             </section>
 
