@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { ensureDbInitialized } from '@/lib/db-init';
 import { getTasks, getTaskStats, getOverdueCount } from '@/db/operations';
 import { jsonSuccess, jsonError } from '@/lib/api-response';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays } from 'date-fns';
+import type { Task } from '@/types/index';
 
 // Ensure database is initialized
 ensureDbInitialized();
@@ -112,7 +113,7 @@ function getDateRange(range: string): { startDate: string; endDate: string } {
   }
 }
 
-function getDailyCompletion(tasks: any[], startDate: string, endDate: string): { date: string; completed: number; created: number }[] {
+function getDailyCompletion(tasks: Task[], startDate: string, endDate: string): { date: string; completed: number; created: number }[] {
   const days: { date: string; completed: number; created: number }[] = [];
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -130,7 +131,7 @@ function getDailyCompletion(tasks: any[], startDate: string, endDate: string): {
   return days;
 }
 
-function getPriorityDistribution(tasks: any[]): { high: number; medium: number; low: number; none: number; completed: { high: number; medium: number; low: number; none: number } } {
+function getPriorityDistribution(tasks: Task[]): { high: number; medium: number; low: number; none: number; completed: { high: number; medium: number; low: number; none: number } } {
   const distribution = { high: 0, medium: 0, low: 0, none: 0 };
   const completed = { high: 0, medium: 0, low: 0, none: 0 };
 
@@ -147,7 +148,7 @@ function getPriorityDistribution(tasks: any[]): { high: number; medium: number; 
   return { ...distribution, completed };
 }
 
-function getTimeTrackingAnalysis(tasks: any[]): {
+function getTimeTrackingAnalysis(tasks: Task[]): {
   totalEstimated: { hours: number; minutes: number };
   totalActual: { hours: number; minutes: number };
   avgEstimatedPerTask: { hours: number; minutes: number };
@@ -196,7 +197,7 @@ function getTimeTrackingAnalysis(tasks: any[]): {
   };
 }
 
-function getListPerformance(tasks: any[]): { listId: string; listName: string; total: number; completed: number; rate: number }[] {
+function getListPerformance(tasks: Task[]): { listId: string; listName: string; total: number; completed: number; rate: number }[] {
   const listMap = new Map<string, { total: number; completed: number }>();
 
   tasks.forEach(task => {
@@ -211,30 +212,44 @@ function getListPerformance(tasks: any[]): { listId: string; listName: string; t
 
   return Array.from(listMap.entries()).map(([listId, stats]) => ({
     listId,
-    listName: tasks.find(t => t.listId === listId)?.listName || 'Unknown',
+    listName: listId === 'inbox' ? 'Inbox' : listId,
     total: stats.total,
     completed: stats.completed,
     rate: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
   }));
 }
 
-function getHourlyProductivityPattern(tasks: any[]): { hour: number; completed: number }[] {
-  const hourCounts = new Array(24).fill(0).map(() => ({ hour: 0, completed: 0 }));
+function getHourlyProductivityPattern(tasks: Task[]): { hour: number; completed: number }[] {
+  const hourCounts: { hour: number; completed: number }[] = [];
+
+  for (let i = 0; i < 24; i++) {
+    hourCounts.push({ hour: i, completed: 0 });
+  }
 
   tasks.filter(t => t.status === 'completed' && t.completedAt).forEach(task => {
-    const hour = new Date(task.completedAt).getHours();
-    hourCounts[hour].hour = hour;
-    hourCounts[hour].completed++;
+    if (task.completedAt) {
+      const hour = new Date(task.completedAt).getHours();
+      if (hour >= 0 && hour < 24) {
+        const entry = hourCounts[hour];
+        if (entry) {
+          entry.completed++;
+        }
+      }
+    }
   });
 
   return hourCounts;
 }
 
-function getStreakData(tasks: any[]): { currentStreak: number; bestStreak: number; streakDates: string[] } {
+function getStreakData(tasks: Task[]): { currentStreak: number; bestStreak: number; streakDates: string[] } {
   const completedDates = new Set(
     tasks
       .filter(t => t.status === 'completed' && t.completedAt)
-      .map(t => format(new Date(t.completedAt), 'yyyy-MM-dd'))
+      .map(t => {
+        if (!t.completedAt) return null;
+        return format(new Date(t.completedAt), 'yyyy-MM-dd');
+      })
+      .filter((date): date is string => date !== null)
   );
 
   let currentStreak = 0;
