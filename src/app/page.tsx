@@ -41,10 +41,12 @@ import {
   List as ListIcon,
   CalendarDays,
   BarChart3,
+  Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyStateIllustration } from '@/components/empty-state-illustration';
 import { cn } from '@/lib/utils';
 import { getTaskAging } from '@/lib/task-utils';
@@ -62,6 +64,9 @@ import { KeyboardShortcutHelp } from '@/components/keyboard-shortcut-help';
 import { PWAPrompt } from '@/components/pwa-install-prompt';
 import { FocusMode } from '@/components/focus-mode';
 import { QuickStats } from '@/components/quick-stats';
+import { GoalTracker } from '@/components/goal-tracker';
+import { HabitTracker } from '@/components/habit-tracker';
+import { AIAssistant } from '@/components/ai-assistant';
 import type { Task, List } from '@/types/index';
 
 // ─── API Helpers ─────────────────────────────────────────────────────────────
@@ -527,6 +532,76 @@ function QuickStatsWidget() {
   );
 }
 
+// ─── Goal Tracker ─────────────────────────────────────────────────────────────
+function GoalTrackerWidget() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 }}
+      className="mb-8"
+    >
+      <GoalTracker />
+    </motion.div>
+  );
+}
+
+// ─── Habit Tracker ────────────────────────────────────────────────────────────
+function HabitTrackerWidget({ tasks, onTaskComplete }: { tasks: Task[]; onTaskComplete: (id: string) => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+      className="mb-8"
+    >
+      <HabitTracker tasks={tasks} onTaskComplete={onTaskComplete} />
+    </motion.div>
+  );
+}
+
+// ─── AI Assistant ─────────────────────────────────────────────────────────────
+function AIAssistantWidget({ onTaskCreate }: { onTaskCreate: (task: { title: string; description?: string; date?: string; priority?: string }) => void }) {
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5 }}
+      className="mb-8"
+    >
+      {isCollapsed ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsCollapsed(false)}
+          className="text-muted-foreground"
+        >
+          Show AI Assistant
+        </Button>
+      ) : (
+        <Card className="border-brand-500/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Bot className="w-4 h-4 text-brand-500" />
+                AI Assistant
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => setIsCollapsed(true)}>
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AIAssistant onTaskCreate={onTaskCreate} />
+          </CardContent>
+        </Card>
+      )}
+    </motion.div>
+  );
+}
+
 // ─── Empty State ─────────────────────────────────────────────────────────────
 function EmptyState({ view, onAddClick }: { view: string; onAddClick: () => void }) {
   const messages: Record<string, { title: string; desc: string }> = {
@@ -833,6 +908,14 @@ export default function HomePage() {
     });
   };
 
+  const handleAddFromAI = (task: { title: string; description?: string; date?: string; priority?: string }) => {
+    createMutation.mutate({
+      title: task.title,
+      date: task.date || null,
+      priority: (task.priority as 'high' | 'medium' | 'low' | 'none') || 'none',
+    });
+  };
+
   const handleAddFromTemplate = (task: Partial<{ title: string; description: string; priority: 'high' | 'medium' | 'low' | 'none'; estimateHours: number; estimateMinutes: number; isAllDay: boolean; recurringType: string }>) => {
     if (!task.title) return;
     createMutation.mutate({
@@ -968,6 +1051,9 @@ export default function HomePage() {
         )}>
           <PageHeader view={activeView} listName={listName} />
           {viewMode === 'list' && <QuickStatsWidget />}
+          {viewMode === 'list' && <GoalTrackerWidget />}
+          {viewMode === 'list' && <HabitTrackerWidget tasks={filteredTasks} onTaskComplete={handleToggle} />}
+          {viewMode === 'list' && <AIAssistantWidget onTaskCreate={handleAddFromAI} />}
 
           {/* View Toggle and Filters */}
           <div className="flex items-center justify-between mb-6">
