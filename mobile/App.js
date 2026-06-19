@@ -3,7 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Provider as PaperProvider } from 'react-native-paper';
-import { Provider as QueryClientProvider } from 'react-query';
+import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { TasksProvider } from './context/TasksContext';
 import HomeScreen from './screens/HomeScreen';
 import TaskDetailScreen from './screens/TaskDetailScreen';
@@ -12,10 +12,11 @@ import ProfileScreen from './screens/ProfileScreen';
 import AuthScreen from './screens/AuthScreen';
 
 const Stack = createNativeStackNavigator();
+const queryClient = new QueryClient();
 
 export default function App() {
   return (
-    <QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
       <PaperProvider>
         <TasksProvider>
           <SafeAreaProvider>
