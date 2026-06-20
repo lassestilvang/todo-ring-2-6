@@ -1,0 +1,62 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+// Protected API routes that require authentication
+const PROTECTED_ROUTES = [
+  '/api/tasks',
+  '/api/lists',
+  '/api/labels',
+  '/api/subtasks',
+  '/api/comments',
+  '/api/sharing',
+  '/api/export',
+  '/api/analytics',
+];
+
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/logout',
+];
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Skip middleware for static assets and public routes
+  if (pathname.startsWith('/_next') || pathname.startsWith('/static')) {
+    return NextResponse.next();
+  }
+
+  // Check if this is a public auth route
+  if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
+    return NextResponse.next();
+  }
+
+  // For protected routes, check for auth token
+  if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
+};
