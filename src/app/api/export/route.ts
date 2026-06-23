@@ -5,6 +5,104 @@ import { generateMarkdown, generateCSV, generatePrintable, generateICS, parseImp
 import { jsonSuccess, jsonError } from '@/lib/api-response';
 import type { Task, List, Label } from '@/types/index';
 
+// Generate PDF buffer - uses Puppeteer if available, falls back to HTML
+async function generatePDFBuffer(data: ExportData): Promise<Buffer> {
+  try {
+    // Try to use Puppeteer for proper PDF generation
+    const puppeteer = (await import('puppeteer')).default;
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+
+    const htmlContent = generatePDFHTML(data);
+    await page.setContent(htmlContent, { waitUntil: 'load' });
+
+    const pdf = await page.pdf({
+      format: 'A4',
+      margin: { top: '20mm', right: '20mm', bottom: '20mm', left: '20mm' },
+    });
+
+    await browser.close();
+    return Buffer.from(pdf);
+  } catch {
+    // Fallback: return HTML as PDF-like response
+    const htmlContent = generatePDFHTML(data);
+    return Buffer.from(htmlContent);
+  }
+}
+
+function generatePDFHTML(data: ExportData): string {
+  const content = generateMarkdown(data);
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>TaskPlanner Export</title>
+    <style>
+      @media screen { body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; } }
+      @media print {
+        body { padding: 0; margin: 0; }
+        .no-print { display: none; }
+        h1 { page-break-before: always; }
+      }
+      h1 { color: #3b82f6; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+      h2 { color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-top: 30px; }
+      .stats { display: flex; gap: 20px; margin: 20px 0; }
+      .stat { background: #f8fafc; padding: 15px 20px; border-radius: 8px; flex: 1; }
+      .stat-value { font-size: 24px; font-weight: bold; color: #3b82f6; }
+      .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+      table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+      th, td { padding: 10px; text-left; border-bottom: 1px solid #e2e8f0; }
+      th { background: #f8fafc; font-weight: 600; }
+      .completed { opacity: 0.6; }
+    </style>
+  </head>
+  <body>
+    <h1>📋 TaskPlanner Export</h1>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">${data.metadata.totalTasks}</div>
+        <div class="stat-label">Total Tasks</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">${data.metadata.completedTasks}</div>
+        <div class="stat-label">Completed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">${Math.round((data.metadata.completedTasks / Math.max(data.metadata.totalTasks, 1)) * 100)}%</div>
+        <div class="stat-label">Completion Rate</div>
+      </div>
+    </div>
+    <hr />
+    <h2>📝 Tasks</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Date</th>
+          <th>Deadline</th>
+          <th>Priority</th>
+          <th>Status</th>
+          <th>Estimate</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.tasks.map(t => `
+          <tr class="${t.status === 'completed' ? 'completed' : ''}">
+            <td>${t.title}</td>
+            <td>${t.date || '-'}</td>
+            <td>${t.deadline || '-'}</td>
+            <td>${t.priority}</td>
+            <td>${t.status}</td>
+            <td>${t.estimateHours || 0}h ${t.estimateMinutes || 0}m</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    ${content}
+  </body>
+</html>`;
+}
+
 ensureDbInitialized();
 
 type ExportData = {
@@ -87,11 +185,13 @@ export async function GET(req: NextRequest) {
     }
 
     if (format === 'pdf') {
-      const pdfUrl = generatePDF(exportData);
-      return new NextResponse(pdfUrl, {
+      // Generate PDF using Puppeteer (server-side)
+      // Falls back to HTML if Puppeteer is not available
+      const pdfBuffer = await generatePDFBuffer(exportData);
+      return new NextResponse(pdfBuffer as unknown as BodyInit, {
         headers: {
-          'Content-Type': 'text/html',
-          'Content-Disposition': `attachment; filename="tasks-${new Date().toISOString().split('T')[0]}.html"`,
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="tasks-${new Date().toISOString().split('T')[0]}.pdf"`,
         },
       });
     }
@@ -102,83 +202,6 @@ export async function GET(req: NextRequest) {
     const message = error instanceof Error ? error.message : 'Failed to export data';
     return jsonError(message, 500, 'EXPORT_ERROR');
   }
-}
-
-function generatePDF(data: ExportData): string {
-  const content = generateMarkdown(data);
-  return `data:text/html;charset=utf-8,${encodeURIComponent(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>TaskPlanner Export</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          @media screen { body { font-family: system-ui; max-width: 900px; margin: 0 auto; padding: 20px; } }
-          @media print {
-            body { padding: 0; margin: 0; }
-            .no-print { display: none; }
-            h1 { page-break-before: always; }
-          }
-          h1 { color: #3b82f6; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
-          h2 { color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-top: 30px; }
-          .stats { display: flex; gap: 20px; margin: 20px 0; }
-          .stat { background: #f8fafc; padding: 15px 20px; border-radius: 8px; flex: 1; }
-          .stat-value { font-size: 24px; font-weight: bold; color: #3b82f6; }
-          .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { padding: 10px; text-left; border-bottom: 1px solid #e2e8f0; }
-          th { background: #f8fafc; font-weight: 600; }
-          .completed { opacity: 0.6; }
-        </style>
-      </head>
-      <body>
-        <h1>📋 TaskPlanner Export</h1>
-        <div class="stats">
-          <div class="stat">
-            <div class="stat-value">${data.metadata.totalTasks}</div>
-            <div class="stat-label">Total Tasks</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value">${data.metadata.completedTasks}</div>
-            <div class="stat-label">Completed</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value">${Math.round((data.metadata.completedTasks / Math.max(data.metadata.totalTasks, 1)) * 100)}%</div>
-            <div class="stat-label">Completion Rate</div>
-          </div>
-        </div>
-        <hr />
-        <h2>📝 Tasks</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Date</th>
-              <th>Deadline</th>
-              <th>Priority</th>
-              <th>Status</th>
-              <th>Estimate</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.tasks.map(t => `
-              <tr class="${t.status === 'completed' ? 'completed' : ''}">
-                <td>${t.title}</td>
-                <td>${t.date || '-'}</td>
-                <td>${t.deadline || '-'}</td>
-                <td>${t.priority}</td>
-                <td>${t.status}</td>
-                <td>${t.estimateHours || 0}h ${t.estimateMinutes || 0}m</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
-      </body>
-    </html>
-  `)}`;
 }
 
 export async function POST(req: NextRequest) {
