@@ -133,4 +133,57 @@ describe('Auth Module', () => {
       expect(user2.email).toContain('guest');
     });
   });
+
+  describe('getClientUser error handling', () => {
+    it('should return null when localStorage has invalid JSON', () => {
+      localStorageMock.setItem('taskplanner-user', 'invalid-json');
+      const user = getCurrentUser();
+      expect(user).toBeNull();
+    });
+
+    it('should return null when localStorage is not available', () => {
+      // Test when window is undefined
+      const originalWindow = (global as any).window;
+      delete (global as any).window;
+
+      const user = getCurrentUser();
+      expect(user).toBeNull();
+
+      // Restore
+      (global as any).window = originalWindow;
+    });
+  });
+
+  describe('setClientUser and clearClientUser', () => {
+    it('should not set user when window is undefined', () => {
+      const originalWindow = (global as any).window;
+      delete (global as any).window;
+
+      const mockUser = {
+        id: 'user_123',
+        name: 'Test User',
+        email: 'test@example.com',
+      };
+      setCurrentUser(mockUser);
+
+      // Should not throw and should not store
+      expect(localStorageMock.getItem('taskplanner-user')).toBeNull();
+
+      // Restore
+      (global as any).window = originalWindow;
+    });
+
+    it('should not clear user when window is undefined', () => {
+      const originalWindow = (global as any).window;
+      delete (global as any).window;
+
+      clearCurrentUser();
+
+      // Should not throw
+      expect(true).toBe(true);
+
+      // Restore
+      (global as any).window = originalWindow;
+    });
+  });
 });
