@@ -1,13 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, addHours, startOfDay, endOfDay, eachHourOfInterval } from 'date-fns';
-import { Clock, Plus, Trash2, GripVertical } from 'lucide-react';
+import { format, startOfDay, endOfDay, eachHourOfInterval } from 'date-fns';
+import { Clock, Plus, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { useDrag, useDrop } from '@dnd-kit/core';
 import type { Task } from '@/types/index';
 
 interface TimeBlock {
