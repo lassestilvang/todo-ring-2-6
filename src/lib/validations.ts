@@ -295,6 +295,69 @@ export const CustomFieldSchema = z.object({
   updatedAt: z.string().datetime().optional(),
 });
 
+// Time Entry Schema
+export const TimeEntrySchema = z.object({
+  id: z.string().uuid().optional(),
+  taskId: z.string().uuid(),
+  startTime: z.string().datetime(),
+  endTime: z.string().datetime().nullable().optional(),
+  duration: z.number().min(1, 'Duration must be at least 1 minute'),
+  description: z.string().max(500).optional().default(''),
+  createdAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(),
+});
+
+// Team Schema
+export const TeamSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1, 'Team name is required').max(100),
+  description: z.string().max(500).optional().default(''),
+  createdAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(),
+});
+
+// AI Assistant Schema
+export const AIAssistantSchema = z.object({
+  prompt: z.string().min(1, 'Prompt is required').max(1000, 'Prompt must be less than 1000 characters'),
+  context: z.object({
+    userId: z.string().optional(),
+    lists: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+    })).optional(),
+    recentTasks: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+      status: z.string(),
+    })).optional(),
+  }).optional(),
+});
+
+// Email Template Schema
+export const EmailTemplateSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1, 'Name is required').max(100),
+  type: z.enum(['reminder', 'welcome', 'password-reset', 'notification']),
+  subject: z.string().min(1, 'Subject is required').max(200),
+  html: z.string().min(1, 'HTML content is required'),
+  text: z.string().min(1, 'Text content is required'),
+  config: z.object({
+    brandColor: z.string().optional(),
+    brandName: z.string().optional(),
+    footerText: z.string().optional(),
+    showLogo: z.boolean().optional(),
+  }),
+});
+
+// Email Template Config type
+export const EmailTemplateConfigSchema = z.object({
+  brandColor: z.string().optional(),
+  brandName: z.string().optional(),
+  footerText: z.string().optional(),
+  showLogo: z.boolean().optional(),
+});
+export type EmailTemplateConfig = z.infer<typeof EmailTemplateConfigSchema>;
+
 // Helper function to validate and parse
 export function validateSchema<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data);
