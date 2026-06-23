@@ -11,7 +11,7 @@ interface PriorityDistributionProps {
 
 export function PriorityDistribution({ data, className }: PriorityDistributionProps) {
   const total = data.high + data.medium + data.low + data.none;
-  const completedTotal = data.completed.high + data.completed.medium + data.completed.low + data.completed.completed;
+  const completedTotal = data.completed.high + data.completed.medium + data.completed.low + data.completed.none;
 
   const priorities = [
     { key: 'high', label: 'High', color: 'bg-red-500', textColor: 'text-red-500', value: data.high, completed: data.completed.high },
