@@ -6,11 +6,9 @@ import {
   addTaskDependency,
   removeTaskDependency,
   getBlockedTasks,
-  canCompleteTask,
 } from '@/db/operations';
 import { jsonSuccess, jsonError } from '@/lib/api-response';
 import { TaskDependencySchema } from '@/lib/validations';
-import type { TaskDependency } from '@/types/index';
 
 ensureDbInitialized();
 
