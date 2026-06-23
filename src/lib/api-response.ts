@@ -6,6 +6,7 @@ export interface ApiResponse<T = any> {
   error?: string;
   code?: string;
   details?: any;
+  pagination?: PaginationMeta;
 }
 
 export interface ApiError {
@@ -14,13 +15,39 @@ export interface ApiError {
   details?: any;
 }
 
+export interface PaginationMeta {
+  limit: number;
+  cursor?: string;
+  hasMore: boolean;
+}
+
 /**
  * Standard API success response
  */
-export function jsonSuccess<T>(data: T, status: number = 200): NextResponse<ApiResponse<T>> {
+export function jsonSuccess<T>(
+  data: T,
+  status: number = 200,
+  pagination?: PaginationMeta
+): NextResponse<ApiResponse<T>> {
   return NextResponse.json<ApiResponse<T>>({
     success: true,
     data,
+    pagination,
+  }, { status });
+}
+
+/**
+ * Paginated response helper
+ */
+export function jsonPaginated<T>(
+  data: T,
+  pagination: PaginationMeta,
+  status: number = 200
+): NextResponse<ApiResponse<T>> {
+  return NextResponse.json<ApiResponse<T>>({
+    success: true,
+    data,
+    pagination,
   }, { status });
 }
 
