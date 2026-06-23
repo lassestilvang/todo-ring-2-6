@@ -1,7 +1,7 @@
-import { NextRequest } from 'next/server';
+// NextRequest removed - not used
 import { ensureDbInitialized } from '@/lib/db-init';
 import { getAllTasks } from '@/db/operations';
-import { jsonSuccess, jsonError } from '@/lib/api-response';
+import { jsonError } from '@/lib/api-response';
 import type { Task } from '@/types/index';
 
 ensureDbInitialized();
@@ -78,7 +78,7 @@ function generateICS(tasks: Task[]): string {
   return ics.join('\r\n');
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const tasks = getAllTasks();
     const icsContent = generateICS(tasks);
