@@ -12,5 +12,7 @@
       "sizes": "any",
       "type": "image/svg+xml"
     }
-  ]
+  ],
+  "prefer_related_applications": false,
+  "quick_install": false
 }
