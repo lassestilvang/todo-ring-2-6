@@ -1,12 +1,12 @@
-import { NextRequest } from 'next/server';
+// NextRequest removed - not used
 import { ensureDbInitialized } from '@/lib/db-init';
-import { getBlockedTasks, getTaskById } from '@/db/operations';
+import { getBlockedTasks } from '@/db/operations';
 import { jsonSuccess, jsonError } from '@/lib/api-response';
 import type { Task } from '@/types/index';
 
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const blockedTasks = getBlockedTasks();
     // Return with task details
