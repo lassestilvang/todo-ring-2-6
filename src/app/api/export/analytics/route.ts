@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const format_ = searchParams.get('format') || 'json';
-    const range = (searchParams.get('range') as string) || 'all';
 
     const tasks = getTasks();
     const stats = getTaskStats();
