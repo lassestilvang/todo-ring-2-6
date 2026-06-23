@@ -9,41 +9,35 @@
  * Or with PM2: pm2 start scripts/notification-scheduler.ts --name "notification-scheduler" -f
  */
 
-import { getUpcomingReminders, updateReminder, getTaskById, getPushSubscriptionsForUser } from '../db/operations';
+import { getUpcomingReminders, updateReminder, getTaskById, getPushSubscriptionsForUser, getUserById, getTaskShares } from '../db/operations';
+import type { PushSubscription } from '../src/types/index';
 import { sendEmail, generateReminderEmail, generateReminderText, isEmailConfigured } from '../src/lib/email';
 import webPush from 'web-push';
+import { getDb } from '../db/operations';
 
 // Configure web-push
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || '';
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
 webPush.setVapidDetails(
   'TaskPlanner',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '',
-  process.env.VAPID_PRIVATE_KEY || ''
+  vapidPublicKey,
+  vapidPrivateKey
 );
 
-interface PushSubscriptionData {
-  id: string;
-  userId: string;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-  createdAt: string;
-}
-
-async function sendPushNotification(subscription: PushSubscriptionData, payload: any): Promise<boolean> {
+async function sendPushNotification(subscription: PushSubscription, payload: any): Promise<boolean> {
   try {
+    // Build the subscription object for web-push
+    const pushSubscription = {
+      endpoint: subscription.endpoint,
+      keys: {
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+      },
+    };
+
     await webPush.sendNotification(
-      subscription.endpoint,
-      JSON.stringify(payload),
-      {
-        vapid: {
-          subject: 'TaskPlanner <noreply@taskplanner.app>',
-          privateKey: process.env.VAPID_PRIVATE_KEY || '',
-        },
-        keys: {
-          p256dh: subscription.p256dh,
-          auth: subscription.auth,
-        },
-      }
+      pushSubscription as webPush.PushSubscription,
+      JSON.stringify(payload)
     );
     return true;
   } catch (error: any) {
@@ -82,8 +76,33 @@ async function processReminders() {
 
     try {
       if (reminder.method === 'email') {
-        // Get user email from DB or environment
-        const userEmail = process.env.DEFAULT_EMAIL_RECIPIENT || 'user@example.com';
+        // Get user email from task owner/assignee
+        let userEmail: string | null = null;
+
+        // Check assignee first
+        if (task.assigneeId) {
+          const assignee = getUserById(task.assigneeId);
+          userEmail = assignee?.email || null;
+        }
+        // Check task shares
+        if (!userEmail) {
+          const shares = getTaskShares(reminder.taskId);
+          if (shares.length > 0 && shares[0]?.userId) {
+            const owner = getUserById(shares[0].userId);
+            userEmail = owner?.email || null;
+          }
+        }
+        // Fallback to first user in DB
+        if (!userEmail) {
+          const user = getDb().prepare('SELECT email FROM users LIMIT 1').get() as { email: string } | undefined;
+          userEmail = user?.email || null;
+        }
+
+        if (!userEmail) {
+          console.log(`No email found for task ${reminder.taskId}, skipping email reminder`);
+          skipped++;
+          continue;
+        }
 
         const emailHtml = generateReminderEmail({
           title: task.title,
@@ -113,7 +132,7 @@ async function processReminders() {
         }
       } else {
         // Push notification
-        const subscriptions = getPushSubscriptionsForUser(task.id);
+        const subscriptions = getPushSubscriptionsForUser(task.assigneeId || '');
         let pushSent = false;
 
         for (const sub of subscriptions) {
@@ -130,7 +149,7 @@ async function processReminders() {
             ],
           };
 
-          if (await sendPushNotification(sub as PushSubscriptionData, payload)) {
+          if (await sendPushNotification(sub, payload)) {
             pushSent = true;
           }
         }
