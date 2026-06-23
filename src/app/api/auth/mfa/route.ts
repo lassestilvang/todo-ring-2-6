@@ -21,7 +21,6 @@ export async function GET(req: NextRequest) {
     }
 
     const secret = getMfaSecret(userId);
-    const isEnabled = !!secret;
 
     // If not enabled, generate a new secret for setup
     if (!secret) {
