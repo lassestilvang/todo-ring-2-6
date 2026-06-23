@@ -198,6 +198,11 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status_sort ON tasks(status, sort_order);
 CREATE INDEX IF NOT EXISTS idx_tasks_list_status ON tasks(list_id, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_date_status ON tasks(date, status);
 
+-- Additional indexes for performance
+CREATE INDEX IF NOT EXISTS idx_tasks_completed_at ON tasks(completed_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_deadline_status ON tasks(deadline, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_priority_status ON tasks(priority, status);
+
 -- Indexes for foreign key joins
 CREATE INDEX IF NOT EXISTS idx_subtasks_task ON subtasks(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_labels_task ON task_labels(task_id);
@@ -440,3 +445,58 @@ CREATE TABLE IF NOT EXISTS notification_settings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_notification_settings_user ON notification_settings(user_id);
+
+-- Email Templates
+CREATE TABLE IF NOT EXISTS email_templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('reminder', 'welcome', 'password-reset', 'notification')),
+    subject TEXT NOT NULL,
+    html TEXT NOT NULL,
+    text TEXT NOT NULL,
+    config TEXT NOT NULL, -- JSON configuration
+    created_by TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_templates_type ON email_templates(type);
+CREATE INDEX IF NOT EXISTS idx_email_templates_created_by ON email_templates(created_by);
+
+-- Time Entries table
+CREATE TABLE IF NOT EXISTS time_entries (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    start_time TEXT NOT NULL,
+    end_time TEXT,
+    duration INTEGER NOT NULL, -- in minutes
+    description TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_time_entries_task ON time_entries(task_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_dates ON time_entries(start_time, end_time);
+
+-- Teams table for collaboration
+CREATE TABLE IF NOT EXISTS teams (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Team members junction table
+CREATE TABLE IF NOT EXISTS team_members (
+    id TEXT PRIMARY KEY,
+    team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT DEFAULT 'viewer' CHECK(role IN ('viewer', 'editor', 'admin')),
+    joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(team_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_role ON team_members(role);
