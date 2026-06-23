@@ -1,3 +1,12 @@
+/**
+ * Authentication Integration Tests
+ *
+ * These tests verify authentication flows.
+ * Run with: npm run test:integration
+ *
+ * Note: These tests use mocked fetch and don't require a running database.
+ */
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock global fetch
