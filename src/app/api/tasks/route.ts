@@ -4,6 +4,7 @@ import {
   createTask,
   getTasks,
   getTasksByLabel,
+  getTasksByLabels,
   getAllTasks,
   getInboxTasks,
   getTasksForToday,
@@ -15,8 +16,10 @@ import {
   updateTaskSortOrder,
 } from '@/db/operations';
 import { TaskSchema, BulkDeleteSchema, TaskReorderSchema } from '@/lib/validations';
-import { jsonSuccess, jsonError, jsonValidationError } from '@/lib/api-response';
+import { jsonSuccess, jsonError, jsonValidationError, jsonPaginated } from '@/lib/api-response';
+import { ErrorCodes } from '@/lib/error-codes';
 import { parseSearchQuery } from '@/lib/nlp';
+import { getFromCache, setInCache } from '@/lib/server-cache';
 import type { Task } from '@/types/index';
 
 // Ensure database is initialized
@@ -30,6 +33,8 @@ export async function GET(req: NextRequest) {
     const labelId = searchParams.get('labelId');
     const date = searchParams.get('date');
     const search = searchParams.get('search');
+    const cursor = searchParams.get('cursor') || undefined;
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
 
     // Filter parameters with proper typing
     const priorityParam = searchParams.get('priorities')?.split(',').filter(Boolean) as ('high' | 'medium' | 'low' | 'none')[] | undefined;
@@ -89,18 +94,36 @@ export async function GET(req: NextRequest) {
     }
 
     if (view === 'today') {
-      const tasks = getTasksForToday();
-      return jsonSuccess(applyFilters(tasks, filters));
+      const cacheKey = `tasks:view:today:${JSON.stringify(filters)}`;
+      let tasks = await getFromCache<Task[]>(cacheKey);
+      if (!tasks) {
+        tasks = getTasksForToday();
+        tasks = applyFilters(tasks, filters);
+        await setInCache(cacheKey, tasks, { ttlSeconds: 30 });
+      }
+      return jsonSuccess(tasks);
     }
 
     if (view === 'next7') {
-      const tasks = getTasksForNext7Days();
-      return jsonSuccess(applyFilters(tasks, filters));
+      const cacheKey = `tasks:view:next7:${JSON.stringify(filters)}`;
+      let tasks = await getFromCache<Task[]>(cacheKey);
+      if (!tasks) {
+        tasks = getTasksForNext7Days();
+        tasks = applyFilters(tasks, filters);
+        await setInCache(cacheKey, tasks, { ttlSeconds: 60 });
+      }
+      return jsonSuccess(tasks);
     }
 
     if (view === 'upcoming') {
-      const tasks = getUpcomingTasks();
-      return jsonSuccess(applyFilters(tasks, filters));
+      const cacheKey = `tasks:view:upcoming:${JSON.stringify(filters)}`;
+      let tasks = await getFromCache<Task[]>(cacheKey);
+      if (!tasks) {
+        tasks = getUpcomingTasks();
+        tasks = applyFilters(tasks, filters);
+        await setInCache(cacheKey, tasks, { ttlSeconds: 60 });
+      }
+      return jsonSuccess(tasks);
     }
 
     if (view === 'all') {
@@ -123,12 +146,35 @@ export async function GET(req: NextRequest) {
       return jsonSuccess(applyFilters(tasks, filters));
     }
 
-    const tasks = getInboxTasks();
-    return jsonSuccess(applyFilters(tasks, filters));
+    // Default: return paginated inbox tasks
+    const allTasks = getInboxTasks();
+    const { tasks, nextCursor } = paginateTasks(allTasks, limit, cursor);
+    return jsonPaginated(tasks, {
+      limit,
+      cursor: nextCursor,
+      hasMore: !!nextCursor,
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch tasks';
-    return jsonError(message, 500, 'FETCH_ERROR');
+    return jsonError(message, 500, ErrorCodes.INTERNAL_ERROR);
   }
+}
+
+/**
+ * Paginate tasks based on cursor and limit
+ */
+function paginateTasks(tasks: Task[], limit: number, cursor?: string): { tasks: Task[]; nextCursor?: string } {
+  let startIndex = 0;
+
+  if (cursor) {
+    const cursorIndex = tasks.findIndex(t => t.id === cursor);
+    startIndex = cursorIndex >= 0 ? cursorIndex + 1 : 0;
+  }
+
+  const paginated = tasks.slice(startIndex, startIndex + limit);
+  const nextCursor = paginated.length === limit ? paginated[paginated.length - 1]?.id : undefined;
+
+  return { tasks: paginated, nextCursor };
 }
 
 // Helper function to apply filters to task array
@@ -155,11 +201,10 @@ function applyFilters(
   }
 
   if (filters.labelFilterIds && filters.labelFilterIds.length > 0) {
+    // Filter tasks that have ALL specified labels
     result = result.filter((t) => {
-      if (!t.id) return false;
-      // Labels are not directly on the Task type, so we skip this filter for now
-      // In a full implementation, tasks would include labels
-      return true;
+      if (!t.labels || t.labels.length === 0) return false;
+      return filters.labelFilterIds!.every(labelId => t.labels!.includes(labelId));
     });
   }
 
@@ -213,7 +258,10 @@ export async function POST(req: NextRequest) {
     return jsonSuccess(newTask, 201);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to process request';
-    return jsonError(message, 500, 'CREATE_ERROR');
+    const code = error instanceof Error && error.message.includes('not found')
+      ? ErrorCodes.NOT_FOUND
+      : ErrorCodes.INTERNAL_ERROR;
+    return jsonError(message, 500, code);
   }
 }
 
@@ -223,7 +271,7 @@ export async function PUT(req: NextRequest) {
     const { id, ...data } = body;
 
     if (!id) {
-      return jsonError('Task ID is required', 400, 'MISSING_ID');
+      return jsonError('Task ID is required', 400, ErrorCodes.MISSING_REQUIRED_FIELD);
     }
 
     const validated = TaskSchema.partial().safeParse(data);
@@ -237,7 +285,10 @@ export async function PUT(req: NextRequest) {
     return jsonSuccess(updatedTask);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update task';
-    return jsonError(message, 500, 'UPDATE_ERROR');
+    const code = error instanceof Error && error.message.includes('not found')
+      ? ErrorCodes.NOT_FOUND
+      : ErrorCodes.INTERNAL_ERROR;
+    return jsonError(message, 500, code);
   }
 }
 
@@ -246,13 +297,13 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) {
-      return jsonError('ID is required', 400, 'MISSING_ID');
+      return jsonError('ID is required', 400, ErrorCodes.MISSING_REQUIRED_FIELD);
     }
     deleteTask(id);
     return jsonSuccess({ success: true }, 200);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to delete task';
-    return jsonError(message, 500, 'DELETE_ERROR');
+    return jsonError(message, 500, ErrorCodes.INTERNAL_ERROR);
   }
 }
 
@@ -275,6 +326,6 @@ export async function PATCH(req: NextRequest) {
     return jsonSuccess({ deleted: validated.data.ids.length }, 200);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to delete tasks';
-    return jsonError(message, 500, 'BULK_DELETE_ERROR');
+    return jsonError(message, 500, ErrorCodes.INTERNAL_ERROR);
   }
 }
