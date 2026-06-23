@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import Sidebar from "@/components/sidebar";
@@ -14,8 +13,6 @@ import { CollaborationIndicator } from "@/components/user-profile";
 import { cn } from "@/lib/utils";
 import { Suspense } from "react";
 import React from "react";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const viewport = {
   width: 'device-width',
@@ -49,7 +46,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn(inter.className, "min-h-screen bg-background antialiased")}>
+      <body className={cn("font-sans", "min-h-screen bg-background antialiased")}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
