@@ -1,14 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { Bot, Send, Loader2, Sparkles, Lightbulb, Calendar, Tag, Flag } from 'lucide-react';
+import { Bot, Send, Loader2, Sparkles, Lightbulb, Calendar, Tag, Flag, TrendingUp, BarChart3, Clock } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { parseNaturalLanguage } from '@/lib/nlp';
+import { format } from 'date-fns';
 
 interface AIAssistantProps {
   onTaskCreate?: (task: { title: string; description?: string; date?: string; priority?: string }) => void;
@@ -21,12 +22,21 @@ interface AIResponse {
   priority?: 'high' | 'medium' | 'low' | 'none';
   tags?: string[];
   confidence: number;
+  estimatedTime?: number; // in minutes
+}
+
+interface PrioritizedTask {
+  id: string;
+  title: string;
+  priority: 'high' | 'medium' | 'low' | 'none';
+  score: number;
 }
 
 export function AIAssistant({ onTaskCreate }: AIAssistantProps) {
   const [input, setInput] = React.useState('');
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [lastResponse, setLastResponse] = React.useState<AIResponse | null>(null);
+  const [prioritizedTasks, setPrioritizedTasks] = React.useState<PrioritizedTask[]>([]);
 
   const handleSubmit = async () => {
     if (!input.trim() || isProcessing) return;
@@ -43,6 +53,7 @@ export function AIAssistant({ onTaskCreate }: AIAssistantProps) {
         date: parsed.date || undefined,
         priority: parsed.priority || 'none',
         confidence: 0.9,
+        estimatedTime: estimateTime(parsed.title),
       };
 
       setLastResponse(response);
@@ -61,6 +72,15 @@ export function AIAssistant({ onTaskCreate }: AIAssistantProps) {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const estimateTime = (title: string): number => {
+    const lowerTitle = title.toLowerCase();
+    if (lowerTitle.includes('meeting') || lowerTitle.includes('call')) return 30;
+    if (lowerTitle.includes('report') || lowerTitle.includes('analysis')) return 120;
+    if (lowerTitle.includes('email') || lowerTitle.includes('review')) return 15;
+    if (lowerTitle.includes('presentation')) return 180;
+    return 30; // default
   };
 
   const suggestions = [
@@ -155,10 +175,45 @@ export function AIAssistant({ onTaskCreate }: AIAssistantProps) {
                   {lastResponse.priority}
                 </span>
               )}
+              {lastResponse.estimatedTime && (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  ~{lastResponse.estimatedTime}m
+                </span>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Smart Prioritization Tips */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <TrendingUp className="w-4 h-4" />
+            Smart Prioritization
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Based on your tasks, here are prioritization suggestions:
+          </p>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span>High Priority</span>
+              <span className="text-muted-foreground">Due soon, high impact</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span>Medium Priority</span>
+              <span className="text-muted-foreground">Normal importance</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span>Low Priority</span>
+              <span className="text-muted-foreground">Flexible timing</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tips */}
       <div className="text-[10px] text-muted-foreground/60">
@@ -170,3 +225,4 @@ export function AIAssistant({ onTaskCreate }: AIAssistantProps) {
     </div>
   );
 }
+
