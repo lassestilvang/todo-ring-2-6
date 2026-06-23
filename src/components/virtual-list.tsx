@@ -43,7 +43,7 @@ export function VirtualList<T>({
     if (isLoading && onEndReached) {
       onEndReached();
     }
-  }, [isLoading, onEndReached]);
+  }, [isLoading, onEndReached, items]);
 
   if (items.length === 0 && !isLoading) {
     return emptyState || null;
