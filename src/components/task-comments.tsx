@@ -32,7 +32,9 @@ function parseMentions(content: string): { text: string; mentions: string[] } {
 
   let match;
   while ((match = mentionRegex.exec(content)) !== null) {
-    mentions.push(match[1]);
+    if (match[1]) {
+      mentions.push(match[1]);
+    }
   }
 
   return { text, mentions };
