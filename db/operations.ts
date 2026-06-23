@@ -384,6 +384,23 @@ export function getTasksByLabel(labelId: string): Task[] {
   `).all(labelId) as Task[];
 }
 
+export function getTasksByLabels(labelIds: string[]): Task[] {
+  const db = getDb();
+  if (!labelIds || labelIds.length === 0) return [];
+
+  const placeholders = labelIds.map(() => '?').join(',');
+  return db.prepare(`
+    SELECT t.* FROM tasks t
+    WHERE t.id IN (
+      SELECT tl.task_id FROM task_labels tl
+      WHERE tl.label_id IN (${placeholders})
+      GROUP BY tl.task_id
+      HAVING COUNT(DISTINCT tl.label_id) = ?
+    )
+    ORDER BY t.sort_order ASC, t.created_at DESC
+  `).all(...labelIds, labelIds.length) as Task[];
+}
+
 export function addLabelToTask(taskId: string, labelId: string): void {
   const db = getDb();
   db.prepare('INSERT OR IGNORE INTO task_labels (task_id, label_id) VALUES (?, ?)').run(taskId, labelId);
