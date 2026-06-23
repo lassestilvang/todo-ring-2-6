@@ -19,7 +19,7 @@ export function MobileQuickAdd({ onAdd, className }: MobileQuickAddProps) {
   const [title, setTitle] = React.useState('');
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedPriority, setSelectedPriority] = React.useState<'high' | 'medium' | 'low' | 'none'>('none');
-  const [selectedDate, setSelectedDate] = React.useState<string>('');
+  const [selectedDate, setSelectedDate] = React.useState<string | undefined>(undefined);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +113,7 @@ export function MobileQuickAdd({ onAdd, className }: MobileQuickAddProps) {
                   </SelectContent>
                 </Select>
 
-                <Select value={selectedDate} onValueChange={setSelectedDate}>
+                <Select value={selectedDate ?? ''} onValueChange={setSelectedDate}>
                   <SelectTrigger className="h-10 rounded-xl">
                     <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
                     <SelectValue placeholder="Due date" />
