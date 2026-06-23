@@ -41,7 +41,6 @@ export function ShareDialog({ open, onOpenChange, taskId, listId, type = 'task' 
   const [email, setEmail] = React.useState('');
   const [isSharing, setIsSharing] = React.useState(false);
   const [selectedRole, setSelectedRole] = React.useState<'viewer' | 'editor' | 'admin'>('viewer');
-  const user = getCurrentUser();
   const queryClient = useQueryClient();
 
   const entityId = taskId || listId;
@@ -91,13 +90,13 @@ export function ShareDialog({ open, onOpenChange, taskId, listId, type = 'task' 
   });
 
   const handleShare = async () => {
-    if (!email.trim() || !user) return;
+    if (!email.trim()) return;
 
     setIsSharing(true);
     try {
       await shareMutation.mutateAsync({
         userId: email.trim(),
-        userName: user.name,
+        userName: email.trim(),
         role: selectedRole,
       });
     } finally {
