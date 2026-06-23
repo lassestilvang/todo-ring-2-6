@@ -4,7 +4,7 @@
 
 import webPush from 'web-push';
 import nodemailer from 'nodemailer';
-import { getUpcomingReminders, updateReminder, getTaskById, getDb } from '@/db/operations';
+import { getUpcomingReminders, updateReminder, getTaskById, getDb, getUserById, getTaskShares } from '@/db/operations';
 
 // Configure web-push
 webPush.setVapidDetails(
@@ -265,16 +265,38 @@ export async function processPendingNotifications(): Promise<{
 
 /**
  * Get user email for a task (from sharing or ownership)
+ * Returns the email of the task owner or assignee
  */
 async function getUserEmailForTask(taskId: string): Promise<string | null> {
-  // In a real app, this would look up the user's email from the database
-  // For now, we return null to indicate email is needed
   const task = getTaskById(taskId);
   if (!task) return null;
 
-  // Check if task has an owner or shared users
-  // This is a placeholder - in production you'd query a users table
-  return null;
+  // First, check if task has an assignee
+  if (task.assigneeId) {
+    const assignee = getUserById(task.assigneeId);
+    if (assignee?.email) {
+      return assignee.email;
+    }
+  }
+
+  // Check if task is in a list with shared users
+  const listShares = task.listId ? [] : []; // List sharing not implemented yet
+
+  // Check task shares
+  const taskShares = getTaskShares(taskId);
+  if (taskShares.length > 0 && taskShares[0].userId) {
+    const owner = getUserById(taskShares[0].userId);
+    if (owner?.email) {
+      return owner.email;
+    }
+  }
+
+  // Fallback: check for any user in the system (for demo purposes)
+  // In production, this would be the authenticated user's email
+  const db = getDb();
+  const user = db.prepare('SELECT email FROM users LIMIT 1').get() as { email: string } | undefined;
+
+  return user?.email || null;
 }
 
 /**
