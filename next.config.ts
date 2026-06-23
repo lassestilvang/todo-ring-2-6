@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
   },
   // Performance monitoring
   experimental: {
-    lazyOnDemandImages: true,
+    // lazyOnDemandImages: true, // Deprecated in Next.js 15
   },
 };
 
