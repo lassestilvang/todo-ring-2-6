@@ -9,8 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { Task } from '@/types/index';
-import type { HabitStreak } from '@/db/operations';
+import type { Task, HabitStreak } from '@/types/index';
 
 interface HabitTrackerProps {
   tasks: Task[];
