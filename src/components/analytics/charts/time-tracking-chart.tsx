@@ -8,8 +8,8 @@ interface TimeTrackingChartProps {
   data: {
     totalEstimated: { hours: number; minutes: number };
     totalActual: { hours: number; minutes: number };
-    avgEstimatedPerTask: { hours: number; minutes: number };
-    avgActualPerTask: { hours: number; minutes: number };
+    avgEstimated: { hours: number; minutes: number };
+    avgActual: { hours: number; minutes: number };
     underEstimation: number;
     overEstimation: number;
   };
