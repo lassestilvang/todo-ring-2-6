@@ -3,7 +3,7 @@
  * Handles all database operations related to tasks
  */
 
-import { getDb } from '@/db/index';
+import { getDb } from '../../db/index';
 import type { Task } from '@/types/index';
 
 export class TaskRepository {
@@ -146,6 +146,12 @@ export class TaskRepository {
     ).all(today, 'completed') as Task[];
   }
 
+  getByDate(date: string): Task[] {
+    return this.db.prepare(
+      'SELECT * FROM tasks WHERE date = ? ORDER BY sort_order ASC, created_at DESC'
+    ).all(date) as Task[];
+  }
+
   getAllTasks(): Task[] {
     return this.db.prepare(
       'SELECT * FROM tasks ORDER BY sort_order ASC, created_at DESC'
@@ -165,6 +171,59 @@ export class TaskRepository {
     return this.db.prepare(
       'SELECT * FROM tasks WHERE title LIKE ? OR description LIKE ? ORDER BY sort_order ASC'
     ).all(`%${query}%`, `%${query}%`) as Task[];
+  }
+
+  toggleStatus(id: string): Task {
+    const task = this.findById(id);
+    if (!task) throw new Error('Task not found');
+
+    const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+    const now = new Date().toISOString();
+
+    this.db.prepare(
+      'UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?'
+    ).run(newStatus, newStatus === 'completed' ? now : null, now, id);
+
+    return this.findById(id)!;
+  }
+
+  getPagination(options: {
+    limit: number;
+    cursor?: string;
+    listId?: string;
+    status?: string;
+  }): { tasks: Task[]; nextCursor: string | null } {
+    const { limit, cursor, listId, status } = options;
+    let query = 'SELECT * FROM tasks WHERE 1=1';
+    const values: any[] = [];
+
+    if (listId) {
+      query += ' AND list_id = ?';
+      values.push(listId);
+    }
+
+    if (status) {
+      query += ' AND status = ?';
+      values.push(status);
+    }
+
+    if (cursor) {
+      const cursorTask = this.findById(cursor);
+      if (cursorTask) {
+        query += ' AND (sort_order > ? OR (sort_order = ? AND created_at > ?))';
+        values.push(cursorTask.sortOrder, cursorTask.sortOrder, cursorTask.createdAt);
+      }
+    }
+
+    query += ' ORDER BY sort_order ASC, created_at DESC LIMIT ?';
+    values.push(limit + 1);
+
+    const results = this.db.prepare(query).all(...values) as Task[];
+    const hasMore = results.length > limit;
+    const tasks = hasMore ? results.slice(0, limit) : results;
+    const nextCursor = hasMore ? tasks[tasks.length - 1].id : null;
+
+    return { tasks, nextCursor };
   }
 
   private camelToSnake(str: string): string {
