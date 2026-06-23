@@ -3,7 +3,7 @@
  * Handles all database operations related to lists
  */
 
-import { getDb } from '@/db/index';
+import { getDb } from '../../db/index';
 import type { List } from '@/types/index';
 
 export class ListRepository {
