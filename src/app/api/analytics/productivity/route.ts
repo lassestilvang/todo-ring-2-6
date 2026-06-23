@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ensureDbInitialized } from '@/lib/db-init';
 import { getDb } from '@/db/index';
-import { getTaskStats, getTasks, getCompletedTodayCount, getOverdueCount, getAllLists } from '@/db/operations';
 
 ensureDbInitialized();
 
