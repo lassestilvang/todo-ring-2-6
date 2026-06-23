@@ -120,11 +120,11 @@ export function BulkActions({ selectedIds, onClearSelection }: BulkActionsProps)
                 {lists.map((list: any) => (
                   <button
                     key={list.id}
-                    onClick={handleMove}
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
                     onClick={() => {
                       setSelectedListId(list.id);
-                      handleMove();
+                      setMovePopoverOpen(false);
+                      setTimeout(() => bulkUpdateMutation.mutate({ ids: Array.from(selectedIds), action: 'move', data: { listId: list.id } }), 100);
                     }}
                   >
                     <span>{list.emoji}</span>
