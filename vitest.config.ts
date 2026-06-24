@@ -14,6 +14,7 @@ export default defineConfig({
       TEST_MODE: 'true',
     },
     exclude: ['tests/e2e/**', 'node_modules/**'],
+    include: ['tests/unit/**/*.test.ts'],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
@@ -22,6 +23,7 @@ export default defineConfig({
         '@/db/index': path.resolve(__dirname, 'db/index.ts'),
         '@/types': path.resolve(__dirname, 'src/types/index.ts'),
         '@/lib': path.resolve(__dirname, 'src/lib'),
+        '@/lib/repositories': path.resolve(__dirname, 'src/lib/repositories/index.ts'),
       },
     },
     optimizeDeps: {
