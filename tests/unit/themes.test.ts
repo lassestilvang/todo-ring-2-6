@@ -47,25 +47,28 @@ describe('Theme Utilities', () => {
       const mockStorage: Record<string, string> = {};
       Object.defineProperty(global, 'localStorage', {
         value: {
-          getItem: (key: string) => mockStorage[key],
+          getItem: (key: string) => mockStorage[key] || null,
           setItem: (key: string, value: string) => { mockStorage[key] = value; },
         },
         writable: true,
+        configurable: true,
       });
 
-      // Set a stored theme
-      (global.localStorage as any).setItem('taskplanner-theme', 'dark');
-      expect(getStoredTheme()).toBe('dark');
+      // Set a stored theme BEFORE calling getStoredTheme
+      mockStorage['taskplanner-theme'] = 'dark';
+      const result = getStoredTheme();
+      expect(result).toBe('dark');
     });
 
     it('should return default when localStorage returns null', () => {
-      const mockStorage: Record<string, string | null> = { 'taskplanner-theme': null };
+      const mockStorage: Record<string, string | null> = {};
       Object.defineProperty(global, 'localStorage', {
         value: {
-          getItem: (key: string) => mockStorage[key],
+          getItem: (key: string) => mockStorage[key] || null,
           setItem: (key: string, value: string) => { mockStorage[key] = value; },
         },
         writable: true,
+        configurable: true,
       });
 
       expect(getStoredTheme()).toBe('default');
@@ -85,13 +88,15 @@ describe('Theme Utilities', () => {
       const mockStorage: Record<string, string> = {};
       Object.defineProperty(global, 'localStorage', {
         value: {
-          getItem: (key: string) => mockStorage[key],
+          getItem: (key: string) => mockStorage[key] || null,
           setItem: (key: string, value: string) => { mockStorage[key] = value; },
         },
         writable: true,
+        configurable: true,
       });
 
       saveTheme('forest');
+      // Check the mockStorage directly
       expect(mockStorage['taskplanner-theme']).toBe('forest');
     });
   });
