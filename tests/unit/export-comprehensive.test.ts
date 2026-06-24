@@ -5,6 +5,8 @@ import {
   generateCSV,
   parseImportData,
   generatePrintable,
+  generateICS,
+  generatePDF,
 } from '../../src/lib/export';
 
 describe('Export Utilities - Comprehensive', () => {
@@ -17,8 +19,8 @@ describe('Export Utilities - Comprehensive', () => {
         title: 'Test Task',
         description: 'Test description',
         listId: 'list-1',
-        date: null,
-        deadline: '2024-01-20',
+        date: '2024-01-20',
+        deadline: '2024-01-25',
         estimateHours: 2,
         estimateMinutes: 30,
         actualHours: 1,
@@ -38,7 +40,7 @@ describe('Export Utilities - Comprehensive', () => {
         title: 'Completed Task',
         description: '',
         listId: 'list-1',
-        date: null,
+        date: '2024-01-18',
         deadline: null,
         estimateHours: 0,
         estimateMinutes: 0,
@@ -208,6 +210,182 @@ describe('Export Utilities - Comprehensive', () => {
       };
       const result = generateCSV(dataWithoutList);
       expect(result).toContain('Test Task');
+    });
+  });
+
+  describe('generateICS', () => {
+    it('should generate valid ICS format', () => {
+      const ics = generateICS(mockData);
+      const decoded = decodeURIComponent(ics);
+      expect(decoded).toContain('BEGIN:VCALENDAR');
+      expect(decoded).toContain('END:VCALENDAR');
+      expect(decoded).toContain('VERSION:2.0');
+    });
+
+    it('should include tasks with dates', () => {
+      const ics = generateICS(mockData);
+      const decoded = decodeURIComponent(ics);
+      expect(decoded).toContain('BEGIN:VEVENT');
+      expect(decoded).toContain('END:VEVENT');
+      expect(decoded).toContain('Test Task');
+    });
+
+    it('should skip tasks without dates', () => {
+      const dataWithoutDate = {
+        ...mockData,
+        tasks: [{ ...mockData.tasks[0], date: null }],
+      };
+      const ics = generateICS(dataWithoutDate);
+      expect(ics).toContain('data:text/calendar;charset=utf-8');
+    });
+
+    it('should include deadline as DUE date', () => {
+      const ics = generateICS(mockData);
+      const decoded = decodeURIComponent(ics);
+      expect(decoded).toContain('DUE:');
+    });
+
+    it('should include priority mapping', () => {
+      const ics = generateICS(mockData);
+      const decoded = decodeURIComponent(ics);
+      expect(decoded).toContain('PRIORITY:');
+    });
+
+    it('should map high priority to 1', () => {
+      const highPriorityTask = {
+        ...mockData,
+        tasks: [{ ...mockData.tasks[0], priority: 'high' as const, date: '2024-01-20' }],
+      };
+      const ics = generateICS(highPriorityTask);
+      const decoded = decodeURIComponent(ics);
+      expect(decoded).toContain('PRIORITY:1');
+    });
+
+    it('should map low priority to 9', () => {
+      const lowPriorityTask = {
+        ...mockData,
+        tasks: [{ ...mockData.tasks[0], priority: 'low' as const, date: '2024-01-20' }],
+      };
+      const ics = generateICS(lowPriorityTask);
+      const decoded = decodeURIComponent(ics);
+      expect(decoded).toContain('PRIORITY:9');
+    });
+
+    it('should map medium priority to 5', () => {
+      const mediumPriorityTask = {
+        ...mockData,
+        tasks: [{ ...mockData.tasks[0], priority: 'medium' as const, date: '2024-01-20' }],
+      };
+      const ics = generateICS(mediumPriorityTask);
+      const decoded = decodeURIComponent(ics);
+      expect(decoded).toContain('PRIORITY:5');
+    });
+
+    it('should mark completed tasks as COMPLETED', () => {
+      const dataWithCompletedDate = {
+        ...mockData,
+        tasks: [{ ...mockData.tasks[0], status: 'completed' as const, date: '2024-01-20' }],
+      };
+      const ics = generateICS(dataWithCompletedDate);
+      const decoded = decodeURIComponent(ics);
+      expect(decoded).toContain('STATUS:COMPLETED');
+    });
+
+    it('should mark pending tasks as NEEDS-ACTION', () => {
+      const ics = generateICS(mockData);
+      const decoded = decodeURIComponent(ics);
+      expect(decoded).toContain('STATUS:NEEDS-ACTION');
+    });
+
+    it('should encode special characters in title', () => {
+      const dataWithSpecialChars = {
+        ...mockData,
+        tasks: [{ ...mockData.tasks[0], title: 'Task with\nnewline', date: '2024-01-20' }],
+      };
+      const ics = generateICS(dataWithSpecialChars);
+      expect(ics).toBeDefined();
+    });
+
+    it('should return data URI', () => {
+      const ics = generateICS(mockData);
+      expect(ics).toContain('data:text/calendar;charset=utf-8');
+    });
+  });
+
+  describe('generatePDF', () => {
+    it('should generate valid HTML PDF format', () => {
+      const pdf = generatePDF(mockData);
+      expect(pdf).toContain('data:text/html;charset=utf-8');
+    });
+
+    it('should include statistics', () => {
+      const pdf = generatePDF(mockData);
+      const decoded = decodeURIComponent(pdf.replace('data:text/html;charset=utf-8,', ''));
+      expect(decoded).toContain('Total Tasks');
+      expect(decoded).toContain('Completed');
+    });
+
+    it('should include tasks table', () => {
+      const pdf = generatePDF(mockData);
+      const decoded = decodeURIComponent(pdf.replace('data:text/html;charset=utf-8,', ''));
+      expect(decoded).toContain('<table>');
+      expect(decoded).toContain('</table>');
+      expect(decoded).toContain('Test Task');
+    });
+
+    it('should include task details in table', () => {
+      const pdf = generatePDF(mockData);
+      const decoded = decodeURIComponent(pdf.replace('data:text/html;charset=utf-8,', ''));
+      expect(decoded).toContain('Title');
+      expect(decoded).toContain('Priority');
+      expect(decoded).toContain('Status');
+    });
+
+    it('should include estimate hours', () => {
+      const pdf = generatePDF(mockData);
+      const decoded = decodeURIComponent(pdf.replace('data:text/html;charset=utf-8,', ''));
+      expect(decoded).toContain('Estimate');
+    });
+
+    it('should handle completed task styling', () => {
+      const pdf = generatePDF(mockData);
+      const decoded = decodeURIComponent(pdf.replace('data:text/html;charset=utf-8,', ''));
+      expect(decoded).toContain('completed');
+    });
+
+    it('should include print script', () => {
+      const pdf = generatePDF(mockData);
+      const decoded = decodeURIComponent(pdf.replace('data:text/html;charset=utf-8,', ''));
+      expect(decoded).toContain('window.print()');
+    });
+
+    it('should handle empty tasks array', () => {
+      const emptyData = {
+        ...mockData,
+        tasks: [],
+      };
+      const pdf = generatePDF(emptyData);
+      expect(pdf).toBeDefined();
+    });
+
+    it('should handle tasks without listId', () => {
+      const dataWithoutList = {
+        ...mockData,
+        lists: [],
+        tasks: [{ ...mockData.tasks[0], listId: null }],
+      };
+      const pdf = generatePDF(dataWithoutList);
+      expect(pdf).toBeDefined();
+    });
+
+    it('should handle tasks with null date', () => {
+      const dataWithNullDate = {
+        ...mockData,
+        tasks: [{ ...mockData.tasks[0], date: null }],
+      };
+      const pdf = generatePDF(dataWithNullDate);
+      const decoded = decodeURIComponent(pdf);
+      expect(decoded).toContain('-');
     });
   });
 });
