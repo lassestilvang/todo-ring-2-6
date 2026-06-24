@@ -50,6 +50,14 @@ describe('Sanitization', () => {
     it('should return default for undefined', () => {
       expect(sanitizeString(undefined, { defaultValue: 'default' })).toBe('default');
     });
+
+    it('should return empty string when no default provided', () => {
+      expect(sanitizeString(undefined)).toBe('');
+    });
+
+    it('should throw for undefined when required', () => {
+      expect(() => sanitizeString(undefined, { required: true })).toThrow('This field is required');
+    });
   });
 
   describe('sanitizeNumber', () => {
