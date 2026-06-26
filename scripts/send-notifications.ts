@@ -9,14 +9,9 @@
 
 import { getUpcomingReminders, updateReminder, getTaskById } from '../db/operations';
 import { sendEmail, generateReminderEmail, generateReminderText } from '../src/lib/email';
+import type { Reminder } from '../src/types/index';
 
-async function sendNotification(reminder: {
-  id: string;
-  taskId: string;
-  remindAt: string;
-  method: 'notification' | 'email';
-  isFired: boolean;
-}) {
+async function sendNotification(reminder: Reminder) {
   const task = getTaskById(reminder.taskId);
   if (!task) {
     console.log(`Task not found for reminder ${reminder.id}`);
