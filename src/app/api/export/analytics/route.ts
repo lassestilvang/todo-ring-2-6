@@ -8,12 +8,12 @@ import type { Task } from '@/types/index';
 // Ensure database is initialized
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const format_ = searchParams.get('format') || 'json';
 
-    const tasks = getTasks();
+    const tasks = getTasks() as Task[];
     const stats = getTaskStats();
     const overdueCount = getOverdueCount();
 
