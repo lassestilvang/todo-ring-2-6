@@ -6,11 +6,15 @@ import { jwtVerify } from 'jose';
 
 ensureDbInitialized();
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
+const secret = new TextEncoder().encode(process.env.JWT_SECRET || '');
 
-export async function GET(req: NextRequest) {
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET environment variable must be set in production');
+}
+
+export async function GET(_req: NextRequest) {
   try {
-    const authHeader = req.headers.get('authorization');
+    const authHeader = _req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
@@ -31,9 +35,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(_req: NextRequest) {
   try {
-    const authHeader = req.headers.get('authorization');
+    const authHeader = _req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
@@ -42,7 +46,7 @@ export async function PUT(req: NextRequest) {
     const { payload } = await jwtVerify(token, secret);
     const userId = payload.userId as string;
 
-    const body = await req.json();
+    const body = await _req.json();
     const updatedUser = updateUser(userId, body);
 
     const { password: _, ...userWithoutPassword } = updatedUser;
