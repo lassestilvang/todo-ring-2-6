@@ -4,7 +4,6 @@ import {
   createTask,
   getTasks,
   getTasksByLabel,
-  getTasksByLabels,
   getAllTasks,
   getInboxTasks,
   getTasksForToday,
@@ -25,9 +24,9 @@ import type { Task } from '@/types/index';
 // Ensure database is initialized
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const view = searchParams.get('view');
     const listId = searchParams.get('listId');
     const labelId = searchParams.get('labelId');
@@ -60,7 +59,7 @@ export async function GET(req: NextRequest) {
       const parsedQuery = parseSearchQuery(search);
 
       // Start with base search results
-      let tasks = searchTasks(parsedQuery.raw);
+      let tasks = searchTasks(parsedQuery.raw) as Task[];
 
       // Apply additional filters from the parsed query
       if (parsedQuery.filters.priority) {
@@ -97,7 +96,7 @@ export async function GET(req: NextRequest) {
       const cacheKey = `tasks:view:today:${JSON.stringify(filters)}`;
       let tasks = await getFromCache<Task[]>(cacheKey);
       if (!tasks) {
-        tasks = getTasksForToday();
+        tasks = getTasksForToday() as Task[];
         tasks = applyFilters(tasks, filters);
         await setInCache(cacheKey, tasks, { ttlSeconds: 30 });
       }
@@ -108,7 +107,7 @@ export async function GET(req: NextRequest) {
       const cacheKey = `tasks:view:next7:${JSON.stringify(filters)}`;
       let tasks = await getFromCache<Task[]>(cacheKey);
       if (!tasks) {
-        tasks = getTasksForNext7Days();
+        tasks = getTasksForNext7Days() as Task[];
         tasks = applyFilters(tasks, filters);
         await setInCache(cacheKey, tasks, { ttlSeconds: 60 });
       }
@@ -119,7 +118,7 @@ export async function GET(req: NextRequest) {
       const cacheKey = `tasks:view:upcoming:${JSON.stringify(filters)}`;
       let tasks = await getFromCache<Task[]>(cacheKey);
       if (!tasks) {
-        tasks = getUpcomingTasks();
+        tasks = getUpcomingTasks() as Task[];
         tasks = applyFilters(tasks, filters);
         await setInCache(cacheKey, tasks, { ttlSeconds: 60 });
       }
@@ -127,22 +126,22 @@ export async function GET(req: NextRequest) {
     }
 
     if (view === 'all') {
-      const tasks = getAllTasks();
+      const tasks = getAllTasks() as Task[];
       return jsonSuccess(applyFilters(tasks, filters));
     }
 
     if (labelId) {
-      const tasks = getTasksByLabel(labelId);
+      const tasks = getTasksByLabel(labelId) as Task[];
       return jsonSuccess(applyFilters(tasks, filters));
     }
 
     if (listId) {
-      const tasks = getTasks(listId, date || undefined);
+      const tasks = getTasks(listId, date || undefined) as Task[];
       return jsonSuccess(applyFilters(tasks, filters));
     }
 
     if (date) {
-      const tasks = getTasks(undefined, date);
+      const tasks = getTasks(undefined, date) as Task[];
       return jsonSuccess(applyFilters(tasks, filters));
     }
 
@@ -231,9 +230,9 @@ function applyFilters(
   return result;
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
 
     // Handle reorder request
     if (body.taskId && body.newPosition !== undefined) {
@@ -265,9 +264,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { id, ...data } = body;
 
     if (!id) {
@@ -292,9 +291,9 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const id = searchParams.get('id');
     if (!id) {
       return jsonError('ID is required', 400, ErrorCodes.MISSING_REQUIRED_FIELD);
@@ -307,9 +306,9 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-export async function PATCH(req: NextRequest) {
+export async function PATCH(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { ids } = body;
 
     const validated = BulkDeleteSchema.safeParse({ ids });
