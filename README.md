@@ -25,6 +25,8 @@ A full-featured task management application built with Next.js 16, React 19, Typ
 - ✅ Task templates and marketplace
 - ✅ Custom fields for tasks
 - ✅ Automation rules engine
+- ✅ AI-powered task prioritization
+- ✅ Smart scheduling suggestions
 
 ### Notifications & Reminders
 - ✅ Email and push notifications
@@ -48,6 +50,10 @@ A full-featured task management application built with Next.js 16, React 19, Typ
 - ✅ Productivity analytics dashboard
 - ✅ Export to ICS, PDF, CSV, Markdown, JSON
 - ✅ Import from various formats
+- ✅ Time tracking summary
+- ✅ Performance insights widget
+- ✅ Team workload analytics
+- ✅ Scheduled exports
 
 ## Tech Stack
 
@@ -202,11 +208,31 @@ npm run test:e2e:debug # Debug mode
 
 The mobile app is built with React Native (Expo) and located in `/mobile`.
 
+### Mobile Features
+- **Home Screen** - Task list with filtering and quick add
+- **Task Details** - Full task view with subtasks, dependencies, and comments
+- **Template Marketplace** - Browse and use task templates
+- **Focus Sessions** - Pomodoro timer with session tracking
+- **Teams** - Team management and collaboration
+- **AI Assistant** - Chat-based task management
+- **Habit Tracker** - Streak tracking for habits
+- **Goal Tracker** - Progress tracking for goals
+- **Time Tracking** - Track time spent on tasks
+
 ```bash
 cd mobile
 npm install
 npm start
 ```
+
+### Mobile Navigation
+The app uses a bottom tab navigator with quick access to:
+- Home (Tasks)
+- Analytics
+- Focus Sessions
+- Template Marketplace
+- Teams
+- Profile
 
 ## License
 
