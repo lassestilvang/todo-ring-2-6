@@ -10,10 +10,10 @@ ensureDbInitialized();
  * Assign a task to a user
  * PUT /api/tasks/[id]/assign
  */
-export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function PUT(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const body = await req.json();
+    const body = await _req.json();
     const { assigneeId, assigneeName } = body;
 
     if (!id) {
@@ -58,7 +58,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
  * Unassign a task
  * DELETE /api/tasks/[id]/assign
  */
-export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
 
