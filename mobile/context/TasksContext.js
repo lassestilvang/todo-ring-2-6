@@ -195,6 +195,57 @@ export function TasksProvider({ children }) {
     }
   };
 
+  const fetchTasks = useCallback(async (filters = {}) => {
+    if (!token) return;
+
+    const params = new URLSearchParams();
+    if (filters.view) params.append('view', filters.view);
+    if (filters.listId) params.append('listId', filters.listId);
+    if (filters.search) params.append('search', filters.search);
+
+    try {
+      const res = await fetch(`http://localhost:3000/api/tasks?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTasks(json.data);
+      }
+    } catch (error) {
+      console.error('Fetch tasks error:', error);
+    }
+  }, [token]);
+
+  const fetchLists = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('http://localhost:3000/api/lists', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.success) {
+        setLists(json.data);
+      }
+    } catch (error) {
+      console.error('Fetch lists error:', error);
+    }
+  }, [token]);
+
+  const fetchLabels = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('http://localhost:3000/api/labels', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.success) {
+        setLabels(json.data);
+      }
+    } catch (error) {
+      console.error('Fetch labels error:', error);
+    }
+  }, [token]);
+
   return (
     <TasksContext.Provider value={{
       tasks,
@@ -211,6 +262,9 @@ export function TasksProvider({ children }) {
       createTask,
       updateTask,
       deleteTask,
+      fetchTasks,
+      fetchLists,
+      fetchLabels,
     }}>
       {children}
     </TasksContext.Provider>
