@@ -6,14 +6,14 @@ import { getCurrentUser } from '@/lib/auth-enhanced';
 
 ensureDbInitialized();
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const user = await getCurrentUser(req);
+    const user = await getCurrentUser(_req);
     if (!user) {
       return jsonError('Not authenticated', 401, 'UNAUTHORIZED');
     }
 
-    const { action, code } = await req.json();
+    const { action, code } = await _req.json();
 
     if (action === 'setup') {
       // Generate MFA secret
