@@ -6,9 +6,9 @@ import { generateSecret, generateQRCode } from '@/lib/totp';
 
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const userId = searchParams.get('userId');
 
     if (!userId) {
@@ -44,9 +44,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { userId, action, code } = body;
 
     if (!userId || !action) {
