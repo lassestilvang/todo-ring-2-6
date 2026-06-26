@@ -7,9 +7,9 @@ import bcrypt from 'bcryptjs';
 
 ensureDbInitialized();
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const validated = RegisterSchema.safeParse(body);
 
     if (!validated.success) {
