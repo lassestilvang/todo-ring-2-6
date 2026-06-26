@@ -3,8 +3,40 @@ import { ensureDbInitialized } from '@/lib/db-init';
 import { jsonSuccess, jsonError, jsonValidationError } from '@/lib/api-response';
 import { AIAssistantSchema } from '@/lib/validations';
 import { parseNaturalLanguage } from '@/lib/nlp';
+import { getAIMonitoringService } from '@/lib/monitoring/ai-monitoring.service';
 
 ensureDbInitialized();
+
+// Performance monitoring decorator
+function withMonitoring(handler) {
+  return async (req, ...args) => {
+    const startTime = Date.now();
+    const monitoringService = getAIMonitoringService();
+
+    try {
+      const result = await handler(req, ...args);
+      const responseTime = Date.now() - startTime;
+
+      return result;
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const userId = req.headers.get('x-user-id') || 'anonymous';
+      const prompt = await req.clone().json().then(body => body.prompt);
+
+      monitoringService.logAIInteraction({
+        userId,
+        prompt: prompt || '',
+        action: 'error',
+        confidence: 0,
+        responseTimeMs: responseTime,
+        success: false,
+        errorMessage: error.message
+      });
+
+      return jsonError(error instanceof Error ? error.message : 'Failed to process AI command', 500, 'AI_ERROR');
+    }
+  };
+}
 
 // LLM Configuration (optional - only used if API key is available)
 const LLM_PROVIDER = process.env.AI_PROVIDER || 'rule-based'; // 'openai', 'anthropic', or 'rule-based'
@@ -15,9 +47,14 @@ const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
  * AI Assistant API for processing natural language commands
  * Supports both rule-based parsing and LLM-powered parsing
  */
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
+  const startTime = Date.now();
+  const monitoringService = getAIMonitoringService();
+  let userId = 'anonymous';
+
   try {
-    const body = await req.json();
+    const body = await _req.json();
+    userId = body.context?.userId || 'anonymous';
     const validated = AIAssistantSchema.safeParse(body);
 
     if (!validated.success) {
@@ -29,8 +66,34 @@ export async function POST(req: NextRequest) {
     const { prompt, context } = validated.data;
     const result = await processAICommand(prompt, context);
 
+    const responseTime = Date.now() - startTime;
+
+    // Log successful interaction
+    await monitoringService.logAIInteraction({
+      userId,
+      prompt,
+      action: result.action,
+      confidence: result.confidence,
+      responseTimeMs: responseTime,
+      success: true
+    });
+
     return jsonSuccess(result);
   } catch (error: unknown) {
+    const responseTime = Date.now() - startTime;
+    const monitoringService = getAIMonitoringService();
+
+    // Log failed interaction
+    await monitoringService.logAIInteraction({
+      userId,
+      prompt: '',
+      action: 'error',
+      confidence: 0,
+      responseTimeMs: responseTime,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error'
+    });
+
     const message = error instanceof Error ? error.message : 'Failed to process AI command';
     return jsonError(message, 500, 'AI_ERROR');
   }
@@ -175,6 +238,8 @@ function processRuleBased(prompt: string) {
       'View tasks: "Show me my tasks for today"',
       'Set priority: "Mark this as high priority"',
       'Complete task: "Mark task X as complete"',
+      'Get smart schedule: "Suggest optimal times for my tasks"',
+      'Check conflicts: "Find scheduling conflicts"',
     ];
   }
 
@@ -199,8 +264,8 @@ function generateTaskSuggestions(parsed: any): string[] {
   return suggestions;
 }
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
+export async function GET(_req: NextRequest) {
+  const { searchParams } = new URL(_req.url);
   const action = searchParams.get('action');
 
   switch (action) {
