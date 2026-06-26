@@ -187,5 +187,14 @@ The TaskPlanner project is now **production-ready** with:
 
 ### 4. Test Coverage
 - Fixed flaky date-based tests in `task-utils.test.ts` and `task-utils-comprehensive.test.ts`
-- All 2,105 tests passing
+- All 2,151 tests passing
 - Added behavior tests for database operations (requires native SQLite bindings)
+
+### 5. New Features Added
+- **AI Features**: Task prioritization, conflict detection, smart scheduling
+- **Automation**: Rules engine with API endpoints
+- **Enhanced Analytics**: Productivity insights, time tracking summaries
+- **Dashboard**: Customizable widgets with drag-and-drop
+- **Performance**: Optimized database queries with eager loading
+- **Error Handling**: 40+ standardized error codes
+- **Documentation**: Complete API documentation
