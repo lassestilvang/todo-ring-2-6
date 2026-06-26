@@ -9,10 +9,10 @@ ensureDbInitialized();
  * Submit a rating for a template
  * POST /api/templates/[id]/rating
  */
-export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function POST(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const body = await req.json();
+    const body = await _req.json();
     const { rating } = body;
 
     if (!id) {
