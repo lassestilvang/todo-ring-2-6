@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { ensureDbInitialized } from '@/lib/db-init';
 import { getTaskStats, getOverdueCount, getCompletedTodayCount } from '@/db/operations';
 import { jsonSuccess, jsonError } from '@/lib/api-response';
