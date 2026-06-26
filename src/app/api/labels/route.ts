@@ -1,23 +1,24 @@
 import { NextRequest } from 'next/server';
 import { ensureDbInitialized } from '@/lib/db-init';
-import { getAllLabels, createLabel, updateLabel as dbUpdateLabel, deleteLabel as dbDeleteLabel, getTaskLabels, addLabelToTask, removeLabelFromTask } from '@/db/operations';
+import { getLabelRepository } from '@/lib/repositories';
 import { LabelSchema } from '@/lib/validations';
 import { jsonSuccess, jsonError, jsonValidationError } from '@/lib/api-response';
 
 // Ensure database is initialized
 ensureDbInitialized();
+const labelRepository = getLabelRepository();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const taskId = searchParams.get('taskId');
 
     if (taskId) {
-      const labels = getTaskLabels(taskId);
+      const labels = labelRepository.findByTask(taskId);
       return jsonSuccess(labels);
     }
 
-    const labels = getAllLabels();
+    const labels = labelRepository.findAll();
     return jsonSuccess(labels);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch labels';
@@ -25,16 +26,16 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
 
     if (body.action === 'assign') {
       if (!body.taskId || !body.labelId) {
         return jsonError('taskId and labelId are required', 400, 'MISSING_FIELDS');
       }
-      addLabelToTask(body.taskId, body.labelId);
-      const labels = getTaskLabels(body.taskId);
+      labelRepository.assignToTask(body.taskId, body.labelId);
+      const labels = labelRepository.findByTask(body.taskId);
       return jsonSuccess(labels);
     }
 
@@ -42,8 +43,8 @@ export async function POST(req: NextRequest) {
       if (!body.taskId || !body.labelId) {
         return jsonError('taskId and labelId are required', 400, 'MISSING_FIELDS');
       }
-      removeLabelFromTask(body.taskId, body.labelId);
-      const labels = getTaskLabels(body.taskId);
+      labelRepository.removeFromTask(body.taskId, body.labelId);
+      const labels = labelRepository.findByTask(body.taskId);
       return jsonSuccess(labels);
     }
 
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
         validated.error.errors.map(e => ({ path: e.path, message: e.message }))
       );
     }
-    const newLabel = createLabel(validated.data);
+    const newLabel = labelRepository.create(validated.data);
     return jsonSuccess(newLabel, 201);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to create label';
@@ -61,9 +62,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { id, ...data } = body;
 
     if (!id) {
@@ -77,7 +78,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const updatedLabel = dbUpdateLabel(id, validated.data);
+    const updatedLabel = labelRepository.update(id, validated.data);
     return jsonSuccess(updatedLabel);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update label';
@@ -85,14 +86,14 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const id = searchParams.get('id');
     if (!id) {
       return jsonError('ID is required', 400, 'MISSING_ID');
     }
-    dbDeleteLabel(id);
+    labelRepository.delete(id);
     return jsonSuccess({ success: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to delete label';
