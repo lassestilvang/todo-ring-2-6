@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const { apiKey, provider = 'resend' } = await req.json();
+    const { apiKey, provider = 'resend' } = await _req.json();
 
     // Store email settings (in production, save to database)
     if (apiKey && provider) {
