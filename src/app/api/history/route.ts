@@ -5,9 +5,9 @@ import { getTaskHistory } from '@/db/operations';
 // Ensure database is initialized
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const taskId = searchParams.get('taskId');
     if (!taskId) {
       return NextResponse.json({ success: false, error: 'taskId is required' }, { status: 400 });
