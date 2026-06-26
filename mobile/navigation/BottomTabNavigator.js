@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Home, Calendar, BarChart3, User } from 'lucide-react-native';
+import { Home, Calendar, BarChart3, User, Clock, Template, Users, Settings } from 'lucide-react-native';
 
 export function BottomTabNavigator({ state, descriptors, navigation }) {
   return (
@@ -34,6 +34,10 @@ export function BottomTabNavigator({ state, descriptors, navigation }) {
               {route.name === 'Calendar' && <Calendar size={24} color={isFocused ? '#3b82f6' : '#6b7280'} />}
               {route.name === 'Analytics' && <BarChart3 size={24} color={isFocused ? '#3b82f6' : '#6b7280'} />}
               {route.name === 'Profile' && <User size={24} color={isFocused ? '#3b82f6' : '#6b7280'} />}
+              {route.name === 'FocusSessions' && <Clock size={24} color={isFocused ? '#3b82f6' : '#6b7280'} />}
+              {route.name === 'TemplateMarketplace' && <Template size={24} color={isFocused ? '#3b82f6' : '#6b7280'} />}
+              {route.name === 'Teams' && <Users size={24} color={isFocused ? '#3b82f6' : '#6b7280'} />}
+              {route.name === 'SavedViews' && <Settings size={24} color={isFocused ? '#3b82f6' : '#6b7280'} />}
             </View>
             <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
               {label}
