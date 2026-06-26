@@ -11,9 +11,9 @@ import { jsonSuccess, jsonError } from '@/lib/api-response';
 
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const taskId = searchParams.get('taskId');
 
     if (taskId) {
@@ -48,9 +48,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { taskId } = body;
 
     if (!taskId) {
@@ -76,9 +76,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const taskId = searchParams.get('taskId');
 
     if (!taskId) {
