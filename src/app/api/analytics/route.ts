@@ -2,17 +2,18 @@ import { NextRequest } from 'next/server';
 import { ensureDbInitialized } from '@/lib/db-init';
 import { getTaskStats, getTasks } from '@/db/operations';
 import { jsonSuccess, jsonError } from '@/lib/api-response';
+import type { Task } from '@/types/index';
 
 // Ensure database is initialized
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const range = searchParams.get('range') || '7d'; // '7d', '30d', '90d'
 
     const stats = getTaskStats();
-    const tasks = getTasks();
+    const tasks = getTasks() as Task[];
 
     // Calculate date range based on parameter
     const days = range === '30d' ? 30 : range === '90d' ? 90 : 7;
