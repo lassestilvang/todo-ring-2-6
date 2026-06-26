@@ -1,65 +1,83 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BarChart3, TrendingUp, Clock, CheckCircle2 } from 'lucide-react-native';
+import { BarChart3, TrendingUp, Clock, CheckCircle2, RefreshCw } from 'lucide-react-native';
+import { ENDPOINTS } from '../config/api';
 
 export default function AnalyticsScreen() {
   const [timeRange, setTimeRange] = useState('week');
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
+
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${ENDPOINTS.analytics}?range=30d`);
+      const json = await res.json();
+      if (json.success) {
+        setAnalytics(json.data);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch analytics');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
         <View style={styles.header}>
           <Text style={styles.title}>Analytics</Text>
-          <View style={styles.rangeSelector}>
-            {(['day', 'week', 'month'] as const).map((range) => (
-              <TouchableOpacity
-                key={range}
-                style={[
-                  styles.rangeButton,
-                  timeRange === range && styles.rangeButtonActive,
-                ]}
-                onPress={() => setTimeRange(range)}
-              >
-                <Text
-                  style={[
-                    styles.rangeText,
-                    timeRange === range && styles.rangeTextActive,
-                  ]}
-                >
-                  {range === 'day' ? 'Day' : range === 'week' ? 'Week' : 'Month'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity onPress={fetchAnalytics} style={styles.refreshButton}>
+            <RefreshCw size={20} color="#6b7280" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.content}>
           <View style={styles.cards}>
             <View style={styles.card}>
               <BarChart3 size={24} color="#3b82f6" />
-              <Text style={styles.cardValue}>85%</Text>
+              <Text style={styles.cardValue}>{analytics?.completionRate || 0}%</Text>
               <Text style={styles.cardLabel}>Completion Rate</Text>
             </View>
             <View style={styles.card}>
               <CheckCircle2 size={24} color="#10b981" />
-              <Text style={styles.cardValue}>42</Text>
+              <Text style={styles.cardValue}>{analytics?.completed || 0}</Text>
               <Text style={styles.cardLabel}>Completed</Text>
             </View>
             <View style={styles.card}>
               <Clock size={24} color="#f59e0b" />
-              <Text style={styles.cardValue}>12h</Text>
+              <Text style={styles.cardValue}>
+                {analytics?.totalTime?.hours || 0}h
+              </Text>
               <Text style={styles.cardLabel}>Time Tracked</Text>
             </View>
             <View style={styles.card}>
               <TrendingUp size={24} color="#8b5cf6" />
-              <Text style={styles.cardValue}>7</Text>
+              <Text style={styles.cardValue}>{analytics?.streak || 0}</Text>
               <Text style={styles.cardLabel}>Current Streak</Text>
             </View>
           </View>
