@@ -1,19 +1,13 @@
-import { NextResponse } from 'next/server';
 import { ensureDbInitialized } from '@/lib/db-init';
 import {
   getAllGoals,
   getGoalsByPeriod,
-  getGoalById,
   createGoal,
   updateGoal,
-  updateGoalProgress,
   deleteGoal,
-  getActiveGoalsByPeriod,
-  getGoalProgress,
 } from '@/db/operations';
 import { jsonSuccess, jsonError } from '@/lib/api-response';
 import { GoalSchema } from '@/types/index';
-import type { Goal } from '@/types/index';
 
 // Ensure database is initialized
 ensureDbInitialized();
@@ -22,7 +16,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') as 'daily' | 'weekly' | 'monthly' | 'yearly' | null;
-    const userId = searchParams.get('userId') || 'current-user'; // In production, get from session
+    // const userId = searchParams.get('userId') || 'current-user'; // In production, get from session
 
     if (period) {
       const goals = getGoalsByPeriod(period);
