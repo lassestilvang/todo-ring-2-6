@@ -12,9 +12,9 @@ import { TaskDependencySchema } from '@/lib/validations';
 
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const taskId = searchParams.get('taskId');
     const view = searchParams.get('view'); // 'blocked' or 'blocking'
 
@@ -45,9 +45,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const validated = TaskDependencySchema.safeParse(body);
 
     if (!validated.success) {
@@ -73,9 +73,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const taskId = searchParams.get('taskId');
     const dependsOnId = searchParams.get('dependsOnId');
 
