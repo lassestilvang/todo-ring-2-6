@@ -80,9 +80,9 @@ This is an automated email from TaskPlanner.`,
   },
 ];
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const type = searchParams.get('type') as 'reminder' | 'welcome' | 'password-reset' | 'notification' | null;
 
     const db = getDb();
@@ -108,9 +108,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const validated = EmailTemplateSchema.safeParse(body);
 
     if (!validated.success) {
