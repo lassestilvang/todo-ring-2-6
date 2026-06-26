@@ -80,7 +80,7 @@ function generateICS(tasks: Task[]): string {
 
 export async function GET() {
   try {
-    const tasks = getAllTasks();
+    const tasks = getAllTasks() as Task[] as Task[];
     const icsContent = generateICS(tasks);
 
     return new Response(icsContent, {
