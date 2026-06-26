@@ -5,9 +5,9 @@ import { getCommentMentions, addCommentMention, markMentionAsNotified } from '@/
 
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const userId = searchParams.get('userId');
 
     if (!userId) {
@@ -22,9 +22,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { commentId, userId, userName } = body;
 
     if (!commentId || !userId || !userName) {
@@ -39,9 +39,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function PATCH(req: NextRequest) {
+export async function PATCH(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { mentionId } = body;
 
     if (!mentionId) {
