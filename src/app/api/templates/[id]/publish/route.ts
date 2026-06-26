@@ -5,9 +5,9 @@ import { jsonSuccess, jsonError } from '@/lib/api-response';
 
 ensureDbInitialized();
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { id } = params;
     const { publish, userId } = body;
 
