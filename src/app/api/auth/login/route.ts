@@ -8,11 +8,15 @@ import { SignJWT } from 'jose';
 
 ensureDbInitialized();
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
+const secret = new TextEncoder().encode(process.env.JWT_SECRET || '');
 
-export async function POST(req: NextRequest) {
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET environment variable must be set in production');
+}
+
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const validated = LoginSchema.safeParse(body);
 
     if (!validated.success) {
