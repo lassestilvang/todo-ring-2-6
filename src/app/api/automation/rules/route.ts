@@ -18,9 +18,9 @@ interface AutomationRule {
 
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const userId = searchParams.get('userId') || 'current-user';
 
     const db = getDb();
@@ -35,9 +35,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const db = getDb();
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
