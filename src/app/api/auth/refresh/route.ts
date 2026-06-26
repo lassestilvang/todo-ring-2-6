@@ -5,9 +5,9 @@ import { verifyRefreshToken, generateAccessToken } from '@/lib/auth-enhanced';
 
 ensureDbInitialized();
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { refreshToken } = body;
 
     if (!refreshToken) {
