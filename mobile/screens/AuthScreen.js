@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,22 +6,99 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TasksContext } from '../context/TasksContext';
+import * as LocalAuthentication from 'expo-local-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isBiometricSupported, setIsBiometricSupported] = useState(false);
+  const [isBiometricEnabled, setIsBiometricEnabled] = useState(false);
   const { login } = useContext(TasksContext);
+
+  useEffect(() => {
+    checkBiometricSupport();
+    loadBiometricPreference();
+  }, []);
+
+  const checkBiometricSupport = async () => {
+    if (Platform.OS === 'web') return;
+
+    const compatible = await LocalAuthentication.hasHardwareAsync();
+    setIsBiometricSupported(compatible);
+  };
+
+  const loadBiometricPreference = async () => {
+    try {
+      const enabled = await AsyncStorage.getItem('biometricEnabled');
+      const userEmail = await AsyncStorage.getItem('userEmail');
+      setIsBiometricEnabled(enabled === 'true');
+
+      if (enabled === 'true' && userEmail) {
+        setEmail(userEmail);
+      }
+    } catch (error) {
+      console.error('Failed to load biometric preference:', error);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    if (!isBiometricSupported) return;
+
+    try {
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!enrolled) {
+        Alert.alert('Biometric Not Available', 'No biometric credentials enrolled.');
+        return;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Authenticate to access TaskPlanner',
+        disableDeviceFallback: false,
+      });
+
+      if (result.success) {
+        const loginResult = await login(email, password);
+        if (loginResult.success) {
+          await AsyncStorage.setItem('userEmail', email);
+          await AsyncStorage.setItem('biometricEnabled', 'true');
+        }
+      } else {
+        Alert.alert('Authentication Failed', result.error || 'Please try again.');
+      }
+    } catch (error) {
+      console.error('Biometric authentication error:', error);
+      Alert.alert('Error', 'Biometric authentication failed.');
+    }
+  };
 
   const handleSubmit = async () => {
     if (isLogin) {
       const result = await login(email, password);
       if (!result.success) {
         Alert.alert('Error', result.error || 'Login failed');
+      } else if (isBiometricSupported && password) {
+        // Offer to enable biometric login
+        Alert.alert(
+          'Biometric Login',
+          'Would you like to enable biometric login for faster access?',
+          [
+            { text: 'Not now', style: 'cancel' },
+            {
+              text: 'Enable',
+              onPress: async () => {
+                await AsyncStorage.setItem('userEmail', email);
+                await AsyncStorage.setItem('biometricEnabled', 'true');
+              },
+            },
+          ]
+        );
       }
     } else {
       // Register
@@ -37,6 +114,12 @@ export default function AuthScreen() {
       } else {
         Alert.alert('Error', json.error || 'Registration failed');
       }
+    }
+  };
+
+  const handleBiometricPress = () => {
+    if (isBiometricEnabled && email) {
+      handleBiometricLogin();
     }
   };
 
@@ -73,6 +156,17 @@ export default function AuthScreen() {
           onChangeText={setPassword}
           secureTextEntry
         />
+
+        {isLogin && isBiometricSupported && (
+          <TouchableOpacity
+            style={styles.biometricButton}
+            onPress={handleBiometricPress}
+          >
+            <Text style={styles.biometricText}>
+              {isBiometricEnabled ? 'Use Face ID / Touch ID' : 'Enable Biometric Login'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.button} onPress={handleSubmit}>
           <Text style={styles.buttonText}>
@@ -150,5 +244,15 @@ const styles = StyleSheet.create({
   switchLink: {
     color: '#3b82f6',
     fontWeight: '600',
+  },
+  biometricButton: {
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  biometricText: {
+    color: '#3b82f6',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
