@@ -1,15 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { Bot, Send, Loader2, Sparkles, Lightbulb, Calendar, Tag, Flag, TrendingUp, BarChart3, Clock } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Bot, Send, Loader2, Sparkles, Lightbulb, Calendar, Flag, TrendingUp, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { parseNaturalLanguage } from '@/lib/nlp';
-import { format } from 'date-fns';
 
 interface AIAssistantProps {
   onTaskCreate?: (task: { title: string; description?: string; date?: string; priority?: string }) => void;
@@ -25,18 +23,10 @@ interface AIResponse {
   estimatedTime?: number; // in minutes
 }
 
-interface PrioritizedTask {
-  id: string;
-  title: string;
-  priority: 'high' | 'medium' | 'low' | 'none';
-  score: number;
-}
-
 export function AIAssistant({ onTaskCreate }: AIAssistantProps) {
   const [input, setInput] = React.useState('');
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [lastResponse, setLastResponse] = React.useState<AIResponse | null>(null);
-  const [prioritizedTasks, setPrioritizedTasks] = React.useState<PrioritizedTask[]>([]);
 
   const handleSubmit = async () => {
     if (!input.trim() || isProcessing) return;
