@@ -11,7 +11,7 @@ const taskRepo = getTaskRepository();
 /**
  * GET /api/tasks/[id] - Get a single task by ID
  */
-export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
 
@@ -35,10 +35,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 /**
  * PUT /api/tasks/[id] - Update a task
  */
-export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function PUT(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const body = await req.json();
+    const body = await _req.json();
 
     if (!id) {
       return jsonError('Task ID is required', 400, 'MISSING_ID');
@@ -61,7 +61,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 /**
  * DELETE /api/tasks/[id] - Delete a task
  */
-export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
 
