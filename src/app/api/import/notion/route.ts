@@ -9,10 +9,10 @@ ensureDbInitialized();
  * Notion database import
  * Accepts Notion database export or API response
  */
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
-    const { database_id, tasks: notionTasks } = body;
+    const body = await _req.json();
+    const { tasks: notionTasks } = body;
 
     if (!notionTasks || !Array.isArray(notionTasks)) {
       return jsonError('No tasks provided', 400, 'MISSING_TASKS');
