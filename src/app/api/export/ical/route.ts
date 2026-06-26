@@ -76,12 +76,12 @@ function escapeICal(text: string): string {
     .replace(/\r/g, '\\r');
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const format = searchParams.get('format') || 'ical';
 
-    const tasks = getTasks();
+    const tasks = getTasks() as Task[];
     const lists = getAllLists();
     const labels = getAllLabels();
 
