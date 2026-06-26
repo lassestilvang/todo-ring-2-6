@@ -17,9 +17,9 @@ export async function GET() {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const validated = ListSchema.safeParse(body);
     if (!validated.success) {
       return jsonValidationError(
@@ -34,9 +34,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { id, ...data } = body;
 
     if (!id) {
@@ -58,9 +58,9 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const id = searchParams.get('id');
     if (!id) {
       return jsonError('ID is required', 400, 'MISSING_ID');
@@ -73,9 +73,9 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-export async function PATCH(req: NextRequest) {
+export async function PATCH(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
 
     // Handle reorder
     if (body.listId && body.newPosition !== undefined) {
