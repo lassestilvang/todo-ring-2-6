@@ -5,9 +5,9 @@ import { getTaskAttachments, createAttachment, deleteAttachment, getTaskById } f
 // Ensure database is initialized
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const taskId = searchParams.get('taskId');
     if (!taskId) {
       return NextResponse.json({ success: false, error: 'taskId is required' }, { status: 400 });
@@ -19,9 +19,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { taskId, filename, fileType, fileSize, filePath } = body;
 
     if (!taskId || !filename) {
@@ -47,9 +47,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const id = searchParams.get('id');
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
