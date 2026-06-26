@@ -500,3 +500,145 @@ CREATE TABLE IF NOT EXISTS team_members (
 CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id);
 CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_team_members_role ON team_members(role);
+
+-- Team Projects (lists that belong to teams)
+CREATE TABLE IF NOT EXISTS team_projects (
+    id TEXT PRIMARY KEY,
+    team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    list_id TEXT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+    role_required TEXT DEFAULT 'viewer' CHECK(role_required IN ('viewer', 'editor', 'admin')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(team_id, list_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_team_projects_team ON team_projects(team_id);
+CREATE INDEX IF NOT EXISTS idx_team_projects_list ON team_projects(list_id);
+
+-- Calendar Connections
+CREATE TABLE IF NOT EXISTS calendar_connections (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL CHECK(provider IN ('google', 'outlook', 'ical')),
+    access_token TEXT NOT NULL,
+    refresh_token TEXT,
+    expires_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_connections_user ON calendar_connections(user_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_connections_provider ON calendar_connections(provider);
+
+-- Focus Sessions (Pomodoro/Deep Work)
+CREATE TABLE IF NOT EXISTS focus_sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+    duration INTEGER NOT NULL, -- in minutes
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    status TEXT NOT NULL CHECK(status IN ('active', 'completed', 'cancelled')) DEFAULT 'active'
+);
+
+CREATE INDEX IF NOT EXISTS idx_focus_sessions_user ON focus_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_focus_sessions_status ON focus_sessions(status);
+
+-- Automation Rules table
+CREATE TABLE IF NOT EXISTS automation_rules (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    name TEXT NOT NULL,
+    trigger_type TEXT NOT NULL CHECK(trigger_type IN ('task_completed', 'task_created', 'task_updated', 'due_date_passed', 'status_changed', 'priority_changed')),
+    trigger_value TEXT,
+    action_type TEXT NOT NULL CHECK(action_type IN ('create_task', 'update_task', 'set_priority', 'add_label', 'assign_user', 'send_notification')),
+    action_value TEXT,
+    is_enabled INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_automation_rules_user ON automation_rules(user_id);
+CREATE INDEX IF NOT EXISTS idx_automation_rules_enabled ON automation_rules(is_enabled);
+
+-- Template Ratings table (updated with user info)
+DROP TABLE IF EXISTS template_ratings;
+CREATE TABLE IF NOT EXISTS template_ratings (
+    id TEXT PRIMARY KEY,
+    template_id TEXT NOT NULL REFERENCES task_templates(id) ON DELETE CASCADE,
+    user_id TEXT,
+    user_name TEXT,
+    rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_template_ratings_template ON template_ratings(template_id);
+CREATE INDEX IF NOT EXISTS idx_template_ratings_user ON template_ratings(user_id);
+
+-- AI Errors Table (for error tracking)
+CREATE TABLE IF NOT EXISTS ai_errors (
+    id TEXT PRIMARY KEY,
+    error_message TEXT NOT NULL,
+    error_stack TEXT,
+    user_id TEXT,
+    endpoint TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_errors_user ON ai_errors(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_errors_endpoint ON ai_errors(endpoint);
+CREATE INDEX IF NOT EXISTS idx_ai_errors_created ON ai_errors(created_at);
+
+-- AI Interactions and Feedback Tables
+CREATE TABLE IF NOT EXISTS ai_interactions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    action TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    response_time_ms INTEGER NOT NULL,
+    success INTEGER DEFAULT 1,
+    error_message TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_interactions_user ON ai_interactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_interactions_action ON ai_interactions(action);
+CREATE INDEX IF NOT EXISTS idx_ai_interactions_created ON ai_interactions(created_at);
+
+CREATE TABLE IF NOT EXISTS ai_feedback (
+    id TEXT PRIMARY KEY,
+    interaction_id TEXT NOT NULL REFERENCES ai_interactions(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+    feedback_text TEXT,
+    was_helpful INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_feedback_interaction ON ai_feedback(interaction_id);
+CREATE INDEX IF NOT EXISTS idx_ai_feedback_user ON ai_feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_feedback_rating ON ai_feedback(rating);
+
+-- URIs table for storing resource identifiers with associated functions
+CREATE TABLE IF NOT EXISTS URIs (
+    id TEXT PRIMARY KEY,
+    uri TEXT NOT NULL UNIQUE,
+    functions TEXT DEFAULT '[]', -- JSON array of function URIs
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_uris_uri ON URIs(uri);
+CREATE INDEX IF NOT EXISTS idx_uris_functions ON URIs(functions);
+-- URIs table with functions column
+CREATE TABLE IF NOT EXISTS URIs (
+    id TEXT PRIMARY KEY,
+    uri TEXT NOT NULL UNIQUE,
+    functions TEXT DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_uris_uri ON URIs(uri);
+CREATE INDEX IF NOT EXISTS idx_uris_functions ON URIs(functions);
