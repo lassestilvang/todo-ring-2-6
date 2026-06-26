@@ -12,11 +12,11 @@ interface ImportResult {
   tasks: { success: number; failed: number };
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   let result: ImportResult = { lists: { success: 0, failed: 0 }, labels: { success: 0, failed: 0 }, tasks: { success: 0, failed: 0 } };
 
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { tasks, lists, labels, version } = body.data || body;
 
     // Validate version
