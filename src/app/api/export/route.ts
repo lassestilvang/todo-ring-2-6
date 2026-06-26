@@ -120,12 +120,12 @@ type ExportData = {
   };
 };
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const format = searchParams.get('format') || 'json';
 
-    const tasks = getAllTasks();
+    const tasks = getAllTasks() as Task[] as Task[];
     const lists = getAllLists();
     const labels = getAllLabels();
 
@@ -204,9 +204,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { json } = body;
 
     if (!json) {
