@@ -357,17 +357,39 @@ Send push notification to user.
 }
 ```
 
-## Analytics (New)
+## Analytics (Enhanced)
 
-### GET `/api/analytics/comprehensive`
+### GET `/api/analytics/productivity`
 
-Get comprehensive analytics with time range filtering.
+Get productivity metrics including streaks, efficiency scores, and weekly trends.
 
 **Query Parameters:**
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `range` | string | `week` | Time range: `day`, `week`, `month`, `quarter`, `year` |
-| `listId` | string | - | Filter by list ID |
+| `range` | string | `30d` | Time range: `7d`, `30d`, `90d` |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "streak": 7,
+    "bestStreak": 14,
+    "averageTaskTime": { "hours": 0, "minutes": 45 },
+    "mostProductiveDay": "Monday",
+    "completionByPriority": { "high": 10, "medium": 5, "low": 3 },
+    "efficiencyScore": 85,
+    "weeklyTrend": [
+      { "date": "2024-01-15", "completed": 5, "created": 3 },
+      ...
+    ]
+  }
+}
+```
+
+### GET `/api/analytics/dashboard`
+
+Get dashboard summary with key metrics.
 
 ### GET `/api/analytics/insights`
 
@@ -389,3 +411,284 @@ Export analytics data.
 |-------|------|---------|-------------|
 | `format` | string | `json` | `json`, `csv`, `markdown`, `printable` |
 | `range` | string | `all` | Time range for data |
+
+## Time Tracking
+
+### GET `/api/time-tracking/summary`
+
+Get time tracking summary including total time and recent entries.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "totalTime": { "hours": 25, "minutes": 30 },
+    "todayTime": { "hours": 2, "minutes": 15 },
+    "activeSessions": 1,
+    "recentEntries": [
+      { "id": "...", "taskId": "...", "description": "...", "duration": 25, "startTime": "..." }
+    ]
+  }
+}
+```
+
+## Focus Sessions
+
+### POST `/api/focus-sessions`
+
+Start a new focus session (Pomodoro).
+
+**Request:**
+```json
+{
+  "taskId": "task-uuid",
+  "duration": 25,
+  "userId": "user-uuid"
+}
+```
+
+### PUT `/api/focus-sessions`
+
+Complete a focus session.
+
+**Request:**
+```json
+{
+  "id": "session-uuid",
+  "status": "completed"
+}
+```
+
+### GET `/api/focus-sessions`
+
+Get focus sessions for a user.
+
+**Query Parameters:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `userId` | string | User ID |
+| `limit` | number | Limit results (default: 10) |
+
+## Teams & Collaboration
+
+### GET `/api/teams`
+
+Get teams for a user.
+
+**Query Parameters:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `userId` | string | User ID to get teams for |
+
+### POST `/api/teams`
+
+Create a new team.
+
+**Request:**
+```json
+{
+  "name": "My Team",
+  "description": "Team description"
+}
+```
+
+### PATCH `/api/teams`
+
+Manage team members.
+
+**Request:**
+```json
+{
+  "teamId": "team-uuid",
+  "userId": "user-uuid",
+  "action": "add",
+  "role": "viewer"
+}
+```
+
+Actions: `add`, `remove`, `update-role`
+
+## Templates Marketplace
+
+### GET `/api/templates/marketplace`
+
+Get available task templates.
+
+**Query Parameters:**
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `category` | string | - | Filter by category |
+| `sortBy` | string | `usage_count` | Sort by: `usage_count`, `avg_rating`, `created_at` |
+| `limit` | number | 20 | Limit results |
+
+### POST `/api/templates/marketplace`
+
+Rate a template.
+
+**Request:**
+```json
+{
+  "templateId": "template-uuid",
+  "rating": 5
+}
+```
+
+## AI Assistant
+
+### POST `/api/ai-assistant`
+
+Process natural language commands and get AI-powered task suggestions.
+
+**Request Body:**
+```json
+{
+  "prompt": "Show me my high priority tasks for today",
+  "context": {
+    "userId": "user-uuid", // Optional: user context
+    "timezone": "America/New_York" // Optional: timezone for date calculations
+  }
+}
+```
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "data": {
+    "action": "view_tasks" | "create_task" | "complete_task" | "delete_task" | "set_priority" | "suggest",
+    "confidence": 0.0-1.0,
+    "data": {
+      "title": "string",
+      "description": "string",
+      "date": "YYYY-MM-DD",
+      "deadline": "YYYY-MM-DD",
+      "priority": "high" | "medium" | "low" | "none",
+      "estimateHours": number,
+      "estimateMinutes": number
+    },
+    "suggestions": ["string"]
+  }
+}
+```
+
+**Examples:**
+
+**View Tasks:**
+```bash
+curl -X POST /api/ai-assistant \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Show me my overdue tasks"}'
+```
+
+**Create Task:**
+```bash
+curl -X POST /api/ai-assistant \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Add a task to call John tomorrow at 2pm about the project"}'
+```
+
+**Set Priority:**
+```bash
+curl -X POST /api/ai-assistant \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Mark the meeting preparation task as high priority"}'
+```
+
+**Smart Suggestions:**
+```bash
+curl -X POST /api/ai-assistant \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "What should I work on next?"}'
+```
+
+**Response Examples:**
+
+**Task Creation Suggestion:**
+```json
+{
+  "success": true,
+  "data": {
+    "action": "create_task",
+    "confidence": 0.92,
+    "data": {
+      "title": "Call John about the project",
+      "description": "Discuss project timeline and deliverables",
+      "date": "2024-01-16",
+      "deadline": null,
+      "priority": "medium",
+      "estimateHours": 1,
+      "estimateMinutes": 0
+    },
+    "suggestions": [
+      "Would you like to add a reminder for this task?",
+      "Should I set a specific time for this call?"
+    ]
+  }
+}
+```
+
+**View Tasks Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "action": "view_tasks",
+    "confidence": 0.88,
+    "data": {
+      "filter": "today"
+    },
+    "suggestions": [
+      "You have 3 high priority tasks due today",
+      "Consider starting with the project proposal review"
+    ]
+  }
+}
+```
+
+### GET `/api/ai-assistant?action=examples`
+
+Get example commands for the AI assistant.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "examples": [
+      "Create a task to review the quarterly report by Friday",
+      "Remind me to call the client tomorrow at 2pm",
+      "Show me my high priority tasks",
+      "Mark the meeting task as complete",
+      "Add a low priority label to task 123",
+      "What tasks do I have due this week?",
+      "Suggest the best time to schedule my dentist appointment",
+      "Find tasks related to the website redesign"
+    ]
+  }
+}
+```
+
+### GET `/api/ai-assistant?action=capabilities`
+
+Get available capabilities of the AI assistant.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "capabilities": [
+      "Create tasks with natural language",
+      "Set priorities and due dates",
+      "View and filter tasks",
+      "Complete and delete tasks",
+      "Manage lists and labels",
+      "Get smart task suggestions based on context",
+      "Recommend optimal scheduling times",
+      "Identify task dependencies and blockers",
+      "Provide productivity insights and recommendations"
+    ]
+  }
+}
+```
