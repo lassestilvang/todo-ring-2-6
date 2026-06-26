@@ -21,9 +21,9 @@ async function getDb() {
   return getDbClient();
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const taskId = searchParams.get('taskId');
 
     if (!taskId) {
@@ -42,9 +42,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const validated = CustomFieldSchema.safeParse(body);
 
     if (!validated.success) {
@@ -72,9 +72,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { id, fieldValue } = body;
 
     if (!id) {
@@ -94,9 +94,9 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const id = searchParams.get('id');
 
     if (!id) {
