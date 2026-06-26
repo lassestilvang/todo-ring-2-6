@@ -28,7 +28,7 @@ export default function AnalyticsPage() {
           </p>
         </div>
 
-        <EnhancedAnalyticsDashboard />
+        <DynamicAnalyticsLoader />
       </div>
     </div>
   );
