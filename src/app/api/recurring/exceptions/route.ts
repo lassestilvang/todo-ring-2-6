@@ -13,8 +13,8 @@ interface RecurringException {
 }
 
 // Get exceptions for a task
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
+export async function GET(_req: NextRequest) {
+  const { searchParams } = new URL(_req.url);
   const taskId = searchParams.get('taskId');
 
   if (!taskId) {
@@ -30,9 +30,9 @@ export async function GET(req: NextRequest) {
 }
 
 // Add an exception
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { taskId, exceptionDate, reason } = body;
 
     if (!taskId || !exceptionDate) {
@@ -59,8 +59,8 @@ export async function POST(req: NextRequest) {
 }
 
 // Remove an exception
-export async function DELETE(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
+export async function DELETE(_req: NextRequest) {
+  const { searchParams } = new URL(_req.url);
   const id = searchParams.get('id');
 
   if (!id) {
