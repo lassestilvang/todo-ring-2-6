@@ -22,11 +22,12 @@ const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
       onValueChange,
       max = 100,
       min = 0,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       step = 1,
       disabled = false,
     } = props;
 
-    const percentage = ((value[0] - min) / (max - min)) * 100;
+    const percentage = ((value?.[0] ?? 50 - min) / (max - min)) * 100;
 
     const handleChange = (newVal: number) => {
       if (disabled || !onValueChange) return;
@@ -37,7 +38,7 @@ const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
     const handleClick = React.useCallback((e: React.MouseEvent<HTMLDivElement>) => {
       if (disabled || !onValueChange || !ref) return;
       const rect = e.currentTarget.getBoundingClientRect();
-      const clickX = ((value[0] - min) / (max - min)) * (rect.width - 40);
+      const clickX = (((value?.[0] ?? 50) - min) / (max - min)) * (rect.width - 40);
       const newValue = min + (clickX / (rect.width - 40)) * (max - min);
       handleChange(newValue);
     }, [disabled, onValueChange, value, min, max, ref]);
