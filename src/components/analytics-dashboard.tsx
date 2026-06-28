@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { BarChart3, TrendingUp, Clock, CheckCircle2, Calendar, Award, Target, Download } from 'lucide-react';
+import { BarChart3, TrendingUp, Clock, CheckCircle2, Calendar, Award, Target } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
 import { toast } from 'sonner';
