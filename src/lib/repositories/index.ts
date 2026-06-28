@@ -13,6 +13,8 @@ export { UserRepository, getUserRepository } from './user-repository';
 export { SubtaskRepository, getSubtaskRepository } from './subtask-repository';
 export { CommentRepository, getCommentRepository } from './comment-repository';
 export { TeamRepository, getTeamRepository } from './team-repository';
+export { AutomationRuleRepository, getAutomationRuleRepository } from './automation-rule-repository';
+export { FocusSessionRepository, getFocusSessionRepository } from './focus-session-repository';
 export { TimeEntryRepository, getTimeEntryRepository } from './time-entry-repository';
 export { ThemeRepository, getThemeRepository } from './theme-repository';
 export { GoalRepository, getGoalRepository } from './goal-repository';
