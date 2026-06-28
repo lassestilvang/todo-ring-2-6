@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 
 interface ProductivityHeatmapProps {
   data: { date: string; completed: number; created: number }[];
