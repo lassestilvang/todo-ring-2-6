@@ -91,6 +91,34 @@ export class TemplateRepository {
     ).run(id);
   }
 
+  update(id: string, data: Partial<Omit<TaskTemplate, 'id' | 'createdAt' | 'updatedAt'>>): TaskTemplate {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (data.name !== undefined) { updates.push('name = ?'); values.push(data.name); }
+    if (data.icon !== undefined) { updates.push('icon = ?'); values.push(data.icon); }
+    if (data.title !== undefined) { updates.push('title = ?'); values.push(data.title); }
+    if (data.description !== undefined) { updates.push('description = ?'); values.push(data.description); }
+    if (data.priority !== undefined) { updates.push('priority = ?'); values.push(data.priority); }
+    if (data.estimateHours !== undefined) { updates.push('estimate_hours = ?'); values.push(data.estimateHours); }
+    if (data.estimateMinutes !== undefined) { updates.push('estimate_minutes = ?'); values.push(data.estimateMinutes); }
+    if (data.isAllDay !== undefined) { updates.push('is_all_day = ?'); values.push(data.isAllDay ? 1 : 0); }
+    if (data.recurringType !== undefined) { updates.push('recurring_type = ?'); values.push(data.recurringType); }
+    if (data.labelIds !== undefined) { updates.push('label_ids = ?'); values.push(JSON.stringify(data.labelIds)); }
+    if (data.category !== undefined) { updates.push('category = ?'); values.push(data.category); }
+    if (data.createdBy !== undefined) { updates.push('created_by = ?'); values.push(data.createdBy); }
+
+    values.push(id);
+
+    this.db.prepare(`UPDATE task_templates SET ${updates.join(', ')}, updated_at = ? WHERE id = ?`).run(
+      ...values,
+      new Date().toISOString(),
+      id
+    );
+
+    return this.findById(id)!;
+  }
+
   delete(id: string): void {
     this.db.prepare('DELETE FROM task_templates WHERE id = ?').run(id);
   }
