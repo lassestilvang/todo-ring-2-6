@@ -32,7 +32,7 @@ export function TimeTracker({ taskId, taskTitle }: TimeTrackerProps) {
   const [description, setDescription] = useState('');
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [reports, setReports] = useState<TimeReport[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month'>('week');
 
   // Load existing time entries
