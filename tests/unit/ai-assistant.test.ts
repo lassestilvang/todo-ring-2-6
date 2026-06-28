@@ -1,4 +1,25 @@
 import { describe, it, expect } from 'vitest';
+import { AIAssistantSchema } from '@/lib/validations';
+
+describe('AI Assistant API Validation', () => {
+  it('should validate AI assistant request with prompt only', () => {
+    const result = AIAssistantSchema.safeParse({ prompt: 'Create a task' });
+    expect(result.success).toBe(true);
+  });
+
+  it('should validate AI assistant request with context', () => {
+    const result = AIAssistantSchema.safeParse({
+      prompt: 'Show me my tasks',
+      context: { userId: 'user-123' }
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject missing prompt', () => {
+    const result = AIAssistantSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+});
 
 // Simple AI command processor for testing
 function processAICommand(prompt: string) {
@@ -30,6 +51,35 @@ function processAICommand(prompt: string) {
   };
 }
 
+// Priority calculation for testing
+function calculateSmartPriority(task: any) {
+  let score = 0;
+
+  // Base priority weighting
+  if (task.priority === 'high') score += 3;
+  else if (task.priority === 'medium') score += 2;
+  else score += 1;
+
+  // Deadline urgency
+  if (task.deadline) {
+    const taskDate = new Date(task.deadline);
+    const now = new Date();
+    const diffHours = (taskDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    if (diffHours <= 0) score += 3;
+    else if (diffHours <= 24) score += 2;
+    else if (diffHours <= 72) score += 1.5;
+    else if (diffHours <= 168) score += 1;
+  }
+
+  // Habit streak bonus
+  if (task.habitStreak?.currentStreak) {
+    score += task.habitStreak.currentStreak * 0.3;
+  }
+
+  return score;
+}
+
 describe('AI Assistant', () => {
   describe('processAICommand', () => {
     it('should detect task creation intent', () => {
@@ -40,8 +90,6 @@ describe('AI Assistant', () => {
     });
 
     it('should detect view tasks intent', () => {
-      // Note: "tasks" contains "task" so it will match create_task pattern
-      // This is expected behavior - the AI will suggest creating a task
       const result = processAICommand('Show me my tasks');
 
       expect(result.action).toBe('create_task');
@@ -53,6 +101,32 @@ describe('AI Assistant', () => {
       expect(result.action).toBe('suggest');
       expect(result.confidence).toBe(0.3);
       expect(result.suggestions.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Priority Calculation', () => {
+    it('should calculate higher priority for high-priority tasks', () => {
+      const task = { priority: 'high' };
+      const score = calculateSmartPriority(task);
+      expect(score).toBeGreaterThan(2);
+    });
+
+    it('should increase score for urgent deadlines', () => {
+      const task = {
+        priority: 'medium',
+        deadline: new Date().toISOString()
+      };
+      const score = calculateSmartPriority(task);
+      expect(score).toBeGreaterThan(5);
+    });
+
+    it('should add bonus for habit streaks', () => {
+      const task = {
+        priority: 'low',
+        habitStreak: { currentStreak: 5 }
+      };
+      const score = calculateSmartPriority(task);
+      expect(score).toBeCloseTo(2.5, 1);
     });
   });
 
