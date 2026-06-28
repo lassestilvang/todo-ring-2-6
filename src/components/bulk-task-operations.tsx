@@ -2,8 +2,17 @@
 
 import * as React from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Trash2, CheckSquare, Square, Copy, Move, Tag } from 'lucide-react';
+import { Trash2, CheckSquare, Move, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
+// TODO: Implement move and label functionality
+// These functions are placeholders for future implementation
+function handleMovePlaceholder() {
+  console.log('Move functionality coming soon');
+}
+function handleAddLabelPlaceholder() {
+  console.log('Add label functionality coming soon');
+}
 import {
   DropdownMenu,
   DropdownMenuContent,
