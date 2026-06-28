@@ -95,6 +95,8 @@ describe('Theme Utilities', () => {
         configurable: true,
       });
 
+      // Set window to make localStorage available
+      global.window = {};
       saveTheme('forest');
       // Check the mockStorage directly
       expect(mockStorage['taskplanner-theme']).toBe('forest');
