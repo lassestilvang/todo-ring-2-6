@@ -87,6 +87,8 @@ export const ReminderSchema = z.object({
   remindAt: z.string(),
   method: z.enum(['notification', 'email']).default('notification'),
   isFired: z.boolean().default(false),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 
 export const AttachmentSchema = z.object({
@@ -136,20 +138,25 @@ export const TaskCommentSchema = z.object({
 });
 
 export const TaskTemplateSchema = z.object({
-  id: z.string(),
-  title: z.string().min(1).max(100),
+  id: z.string().uuid().optional(),
+  name: z.string().min(1, 'Name is required'),
+  icon: z.string().default('📋'),
+  title: z.string().min(1, 'Title is required'),
   description: z.string().default(''),
   priority: Priority.default('none'),
   estimateHours: z.number().default(0),
   estimateMinutes: z.number().default(0),
   isAllDay: z.boolean().default(false),
   recurringType: RecurringType.default('none'),
-  tags: z.array(z.string()).default([]),
+  recurringInterval: z.string().default(''),
+  labelIds: z.array(z.string().uuid()).default([]),
+  category: z.string().default('general'),
+  createdBy: z.string().optional(),
+  createdAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(),
+  usageCount: z.number().default(0),
+  avgRating: z.number().default(0),
   isPublic: z.boolean().default(false),
-  downloadCount: z.number().default(0),
-  rating: z.number().default(0),
-  createdAt: z.string(),
-  updatedAt: z.string(),
 });
 
 // PushSubscription is defined in db/operations.ts as an interface
@@ -198,7 +205,17 @@ export type ListShare = z.infer<typeof ListShareSchema>;
 export type Goal = z.infer<typeof GoalSchema>;
 export type TaskComment = z.infer<typeof TaskCommentSchema>;
 export type TaskTemplate = z.infer<typeof TaskTemplateSchema>;
-export type TimeEntry = z.infer<typeof TimeEntrySchema>;
+
+// Template Rating type
+export const TemplateRatingSchema = z.object({
+  id: z.string(),
+  templateId: z.string(),
+  userId: z.string().optional(),
+  userName: z.string().optional(),
+  rating: z.number().min(1).max(5),
+  createdAt: z.string(),
+});
+export type TemplateRating = z.infer<typeof TemplateRatingSchema>;
 
 // === Team Schemas ===
 export const TeamSchema = z.object({
@@ -391,6 +408,32 @@ export const TimeEntrySchema = z.object({
   createdAt: z.string().datetime().optional(),
   updatedAt: z.string().datetime().optional(),
 });
+
+export type TimeEntry = z.infer<typeof TimeEntrySchema>;
+
+// === Focus Session Schema ===
+export const FocusSessionSchema = z.object({
+  id: z.string().uuid().optional(),
+  taskId: z.string().uuid().optional(),
+  duration: z.number().min(1, 'Duration must be at least 1 minute').max(1440, 'Duration cannot exceed 24 hours'),
+  userId: z.string().uuid(),
+  startedAt: z.string().datetime(),
+  completedAt: z.string().datetime().nullable().optional(),
+  status: z.enum(['active', 'completed', 'cancelled']).default('active'),
+});
+
+export type FocusSession = z.infer<typeof FocusSessionSchema>;
+
+// === Team Member Schema ===
+export const TeamMemberSchema = z.object({
+  id: z.string().uuid().optional(),
+  teamId: z.string().uuid(),
+  userId: z.string().uuid(),
+  role: z.enum(['viewer', 'editor', 'admin']).default('viewer'),
+  joinedAt: z.string().datetime().optional(),
+});
+
+export type TeamMember = z.infer<typeof TeamMemberSchema>;
 
 // === Habit Streak Schema ===
 export const HabitStreakSchema = z.object({
