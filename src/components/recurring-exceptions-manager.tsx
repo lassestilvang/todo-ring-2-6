@@ -9,8 +9,20 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
+
+interface RecurringException {
+  id: string;
+  exceptionDate: string;
+  reason?: string;
+}
+
+interface RecurringExceptionsManagerProps {
+  taskId: string;
+  exceptions: RecurringException[];
+  onAddException?: (date: string, reason?: string) => void;
+  onRemoveException?: (id: string) => void;
+}
 
 interface RecurringException {
   id: string;
@@ -78,10 +90,15 @@ export function RecurringExceptionsManager({
           </PopoverTrigger>
           <PopoverContent className="w-auto p-4">
             <div className="space-y-3">
-              <CalendarComponent
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
+              <Input
+                type="date"
+                value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+                onChange={(e) => {
+                  const dateStr = e.target.value;
+                  if (dateStr) {
+                    setSelectedDate(new Date(dateStr));
+                  }
+                }}
                 disabled={(date) => isExceptionDate(date)}
               />
               <Textarea
