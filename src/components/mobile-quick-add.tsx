@@ -120,8 +120,8 @@ export function MobileQuickAdd({ onAdd, className }: MobileQuickAddProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">No date</SelectItem>
-                    <SelectItem value={new Date().toISOString().split('T')[0]}>Today</SelectItem>
-                    <SelectItem value={new Date(Date.now() + 86400000).toISOString().split('T')[0]}>Tomorrow</SelectItem>
+                    <SelectItem value={new Date().toISOString().split('T')[0] ?? ''}>Today</SelectItem>
+                    <SelectItem value={(new Date(Date.now() + 86400000)).toISOString().split('T')[0] ?? ''}>Tomorrow</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
