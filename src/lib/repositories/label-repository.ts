@@ -118,6 +118,27 @@ export class LabelRepository {
       ORDER BY l.created_at DESC
     `).all(taskId) as Label[];
   }
+
+  /**
+   * Alias for getLabelsForTask - for API compatibility
+   */
+  findByTask(taskId: string): Label[] {
+    return this.getLabelsForTask(taskId);
+  }
+
+  /**
+   * Alias for addLabelToTask - for API compatibility
+   */
+  assignToTask(taskId: string, labelId: string): void {
+    this.addLabelToTask(taskId, labelId);
+  }
+
+  /**
+   * Alias for removeLabelFromTask - for API compatibility
+   */
+  removeFromTask(taskId: string, labelId: string): void {
+    this.removeLabelFromTask(taskId, labelId);
+  }
 }
 
 let labelRepository: LabelRepository | null = null;
