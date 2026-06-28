@@ -14,9 +14,9 @@ export async function GET() {
 }
 
 // Create a new theme
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const validated = ThemeSchema.safeParse(body);
 
     if (!validated.success) {
