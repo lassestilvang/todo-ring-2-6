@@ -5,20 +5,21 @@ import { jsonSuccess, jsonError } from '@/lib/api-response';
 
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const category = searchParams.get('category') || undefined;
     const sortBy = searchParams.get('sortBy') || 'usage_count'; // usage_count, avg_rating, created_at
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    const templates = getTemplates(category || undefined, sortBy as any, limit);
+    const templates = getTemplates(category || undefined, sortBy as 'usage_count' | 'avg_rating' | 'created_at' | 'name', limit);
     
     // Add rating info to each template
     const templatesWithRatings = templates.map(t => {
-      const ratings = getTemplateRatings(t.id);
-      const avgRating = ratings.length > 0 
-        ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length 
+      const templateId = t.id || '';
+      const ratings = getTemplateRatings(templateId);
+      const avgRating = ratings.length > 0
+        ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
         : 0;
       return {
         ...t,
@@ -34,10 +35,10 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const body = await req.json();
-    const { templateId, rating, userId } = body;
+    const body = await _req.json();
+    const { templateId, rating } = body;
 
     if (!templateId || !rating) {
       return jsonError('templateId and rating are required', 400, 'MISSING_PARAMS');
