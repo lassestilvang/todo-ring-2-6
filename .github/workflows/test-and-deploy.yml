@@ -1,0 +1,107 @@
+name: CI/CD Test Suite
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+env:
+  NODE_OPTIONS: --max-old-space-size=4096
+  CI: true
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    name: Install & Lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run static analysis
+        run: npm run lint && npm run type-check
+
+  unit-tests:
+    needs: setup
+    runs-on: ubuntu-latest
+    name: Unit & Integration Tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run test:unit -- --coverage --runInBand
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+      - name: Enforce coverage thresholds
+        run: npm run coverage:check
+
+  security-scan:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    name: Security Scan
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - name: Install Snyk
+        run: npm install -g snyk
+      - name: Run Snyk vulnerability scan
+        run: snyk test --severity-threshold=high
+      - name: Run OWASP ZAP scan
+        uses: zaproxy/action-baseline@v3
+        with:
+          target: 'http://localhost:3000/health'
+          fail_action: 'true'
+
+  performance-test:
+    needs: security-scan
+    runs-on: ubuntu-latest
+    name: Performance Load Test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - name: Install Artillery
+        run: npm install -g artillery
+      - name: Execute load test
+        run: artillery test ./tests/load/performance.yaml --count 500 --stageCount 10
+        timeout-minutes: 10
+      - name: Publish performance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: ./reports/
+
+  build-and-deploy:
+    needs: [unit-tests, performance-test]
+    runs-on: ubuntu-latest
+    name: Build & Deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run build
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-build
+          path: ./dist
