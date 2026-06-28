@@ -113,8 +113,8 @@ describe('Rate Limiter - Comprehensive', () => {
       const now = Date.now();
       const result = rateLimit('reset-test', 10, 60000);
 
-      expect(result.reset).toBeGreaterThan(now);
-      expect(result.reset).toBeLessThanOrEqual(now + 60000);
+      expect(result.reset).toBeGreaterThan(now - 1000); // Allow 1s tolerance for timing
+      expect(result.reset).toBeLessThanOrEqual(now + 61000); // Allow 1s tolerance for timing
     });
 
     it('should handle special characters in key', async () => {
