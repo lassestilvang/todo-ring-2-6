@@ -333,6 +333,28 @@ export const AIAssistantSchema = z.object({
   }).optional(),
 });
 
+// AI Schedule Schema
+export const AIScheduleSchema = z.object({
+  taskIds: z.array(z.string().uuid()).min(1, 'At least one task ID is required'),
+  range: z.enum(['7d', '30d', '90d']).default('30d'),
+});
+
+// Calendar Connection Schema
+export const CalendarConnectionSchema = z.object({
+  provider: z.enum(['google', 'outlook', 'ical']),
+  accessToken: z.string().min(1, 'Access token is required'),
+  refreshToken: z.string().optional(),
+  expiresAt: z.string().datetime().optional(),
+  userId: z.string().uuid(),
+});
+
+// Focus Session Schema
+export const FocusSessionSchema = z.object({
+  taskId: z.string().uuid().optional(),
+  duration: z.number().min(1, 'Duration must be at least 1 minute').max(1440, 'Duration cannot exceed 24 hours'),
+  userId: z.string().uuid(),
+});
+
 // Email Template Schema
 export const EmailTemplateSchema = z.object({
   id: z.string().uuid().optional(),
