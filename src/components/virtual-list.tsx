@@ -1,9 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { FixedSizeList as List, VariableSizeList } from 'react-window';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useState, useEffect, useCallback } from 'react';
+import { FixedSizeList as List } from 'react-window';
 
 interface VirtualListProps<T> {
   items: T[];
