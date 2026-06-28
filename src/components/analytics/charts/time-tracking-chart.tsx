@@ -8,8 +8,8 @@ interface TimeTrackingChartProps {
   data: {
     totalEstimated: { hours: number; minutes: number };
     totalActual: { hours: number; minutes: number };
-    avgEstimated: { hours: number; minutes: number };
-    avgActual: { hours: number; minutes: number };
+    avgEstimatedPerTask: { hours: number; minutes: number };
+    avgActualPerTask: { hours: number; minutes: number };
     underEstimation: number;
     overEstimation: number;
   };
@@ -80,11 +80,11 @@ export function TimeTrackingChart({ data, className }: TimeTrackingChartProps) {
             <p className="text-[10px] text-muted-foreground">On Track</p>
           </div>
           <div className="bg-muted/20 rounded-lg p-3">
-            <p className="text-lg font-bold">{data.avgEstimated.hours}h {data.avgEstimated.minutes}m</p>
+            <p className="text-lg font-bold">{data.avgEstimatedPerTask.hours}h {data.avgEstimatedPerTask.minutes}m</p>
             <p className="text-[10px] text-muted-foreground">Avg Estimate</p>
           </div>
           <div className="bg-muted/20 rounded-lg p-3">
-            <p className="text-lg font-bold">{data.avgActual.hours}h {data.avgActual.minutes}m</p>
+            <p className="text-lg font-bold">{data.avgActualPerTask.hours}h {data.avgActualPerTask.minutes}m</p>
             <p className="text-[10px] text-muted-foreground">Avg Actual</p>
           </div>
         </div>
