@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Calendar, ListFilter, CheckCircle2, Clock, Target } from 'lucide-react';
+import { Sparkles, ListFilter } from 'lucide-react';
 
 interface EmptyStateIllustrationProps {
   view: string;
