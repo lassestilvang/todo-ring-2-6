@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Trash2, CheckSquare, Square, Copy, Move, Tag, AlertCircle } from 'lucide-react';
+import { Trash2, CheckSquare, Square, Copy, Move, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -70,11 +70,6 @@ export function BulkActions({ selectedIds, onClearSelection }: BulkActionsProps)
     }
 
     bulkUpdateMutation.mutate({ ids: Array.from(selectedIds), action });
-  };
-
-  const handleMove = () => {
-    if (selectedIds.size === 0 || !selectedListId) return;
-    bulkUpdateMutation.mutate({ ids: Array.from(selectedIds), action: 'move', data: { listId: selectedListId } });
   };
 
   const handlePriorityChange = (priority: 'high' | 'medium' | 'low') => {
