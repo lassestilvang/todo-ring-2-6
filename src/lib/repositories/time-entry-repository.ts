@@ -58,6 +58,13 @@ export class TimeEntryRepository {
     this.db.prepare('DELETE FROM time_entries WHERE task_id = ?').run(taskId);
   }
 
+  /**
+   * Alias for findByTaskId - for API compatibility
+   */
+  findByTask(taskId: string): TimeEntry[] {
+    return this.findByTaskId(taskId);
+  }
+
   getReports(period: 'day' | 'week' | 'month' = 'week', taskId?: string): { totalMinutes: number; entries: TimeEntry[] } {
     const now = new Date();
     let startDate: Date;
