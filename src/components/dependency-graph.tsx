@@ -1,10 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Link, AlertCircle, CheckCircle, X, Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Link, AlertCircle, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Task, TaskDependency } from '@/types/index';
