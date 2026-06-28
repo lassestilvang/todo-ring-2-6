@@ -149,3 +149,34 @@ export async function setInCache<T>(key: string, value: T, options?: CacheOption
 export async function delFromCache(key: string): Promise<void> {
   return serverCache.del(key);
 }
+
+/**
+ * Cache warming - pre-populate cache with frequently accessed data
+ * Call this on server startup or periodically
+ */
+export async function warmCache(): Promise<void> {
+  // Warm popular task views
+  const popularViews = ['today', 'next7', 'upcoming'];
+  for (const view of popularViews) {
+    try {
+      const data = await fetch(`/api/tasks?view=${view}`).then(r => r.json());
+      if (data.success) {
+        await setInCache(`tasks:${view}`, data.data, { ttlSeconds: 300 }); // 5 min cache
+      }
+    } catch (error) {
+      console.warn(`Failed to warm cache for view ${view}`);
+    }
+  }
+}
+
+/**
+ * Invalidate cache keys matching a pattern
+ */
+export async function invalidatePattern(pattern: string): Promise<void> {
+  // For memory cache, we need to clear and rebuild
+  // For Redis, we could use KEYS command (not recommended in production)
+  const keys = Array.from((global as any).__cache__ || []).filter((k: string) => k.includes(pattern));
+  for (const key of keys) {
+    await serverCache.del(key);
+  }
+}
