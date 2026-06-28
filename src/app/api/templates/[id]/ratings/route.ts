@@ -29,9 +29,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const body = await req.json();
+    const body = await _req.json();
     const { id } = params;
     const { rating, userId, userName } = body;
 
