@@ -1,0 +1,44 @@
+{
+  "audit": {
+    "date": "2026-06-29",
+    "platform": "React Native",
+    "framework": "Expo",
+    "accessibilityStandard": "WCAG 2.1 AA",
+    "issues": [
+      {
+        "id": "AX-001",
+        "severity": "high",
+        "component": "AuthScreen",
+        "description": "Missing accessibilityLabel for password input",
+        "fix": "Add accessibilityLabel='Password' to TextInput"
+      },
+      {
+        "id": "AX-002",
+        "severity": "medium",
+        "component": "AuthScreen",
+        "description": "Buttons lack accessibilityHint",
+        "fix": "Add accessibilityHint to TouchableOpacity components"
+      },
+      {
+        "id": "AX-003",
+        "severity": "medium",
+        "component": "All Screens",
+        "description": "Missing accessibilityTracker for screen transitions",
+        "fix": "Implement accessibilityTracker from react-native"
+      },
+      {
+        "id": "AX-004",
+        "severity": "low",
+        "component": "All Components",
+        "description": "Color contrast ratios not verified",
+        "fix": "Run accessibility audit with axe-core"
+      }
+    ],
+    "recommendations": [
+      "Implement focus management for keyboard navigation",
+      "Add screen reader announcements for dynamic content",
+      "Ensure all interactive elements have proper role attributes",
+      "Implement reduced motion support for animations"
+    ]
+  }
+}
