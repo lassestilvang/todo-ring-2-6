@@ -13,9 +13,9 @@ interface TimeEntryReport {
 }
 
 // GET /api/time-entries/reports?period=week|month
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const period = searchParams.get('period') || 'week';
     const taskId = searchParams.get('taskId');
 
