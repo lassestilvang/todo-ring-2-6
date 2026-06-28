@@ -6,9 +6,7 @@ import {
   CheckCircle2,
   Clock,
   TrendingUp,
-  Award,
   Calendar,
-  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
