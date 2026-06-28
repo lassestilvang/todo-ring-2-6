@@ -3,11 +3,10 @@
 import * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Plus, X, BarChart3, List, Calendar, Clock, Target, TrendingUp, Award, Settings } from 'lucide-react';
+import { X, Calendar, Clock, Target, TrendingUp, Award, Settings, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface WidgetConfig {
@@ -65,7 +64,8 @@ export function DashboardWidgets() {
 
   const enabledWidgets = widgets.filter(w => w.enabled);
 
-  const updateWidget = (id: string, updates: Partial<WidgetConfig>) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _updateWidget = (id: string, updates: Partial<WidgetConfig>) => {
     const newWidgets = widgets.map(w => w.id === id ? { ...w, ...updates } : w);
     setWidgets(newWidgets);
     localStorage.setItem('dashboard-widgets', JSON.stringify(newWidgets));
@@ -79,7 +79,7 @@ export function DashboardWidgets() {
       id: `${template.id}-${Date.now()}`,
       type: template.id as any,
       title: template.name,
-      size: template.size,
+      size: template.size as 'small' | 'medium' | 'large',
       enabled: true,
     };
     setWidgets([...widgets, newWidget]);
