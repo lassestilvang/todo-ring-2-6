@@ -5,9 +5,9 @@ import { jsonSuccess, jsonError } from '@/lib/api-response';
 // In production, this would be a dedicated WebSocket server
 // For now, we provide configuration for the client to connect
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const url = new URL(req.url);
+    const url = new URL(_req.url);
     const taskId = url.searchParams.get('taskId');
     const listId = url.searchParams.get('listId');
     const userId = url.searchParams.get('userId') || 'anonymous';
