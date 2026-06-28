@@ -6,11 +6,10 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-f
 
 ensureDbInitialized();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(_req.url);
     const period = (searchParams.get('period') as 'day' | 'week' | 'month' | 'quarter' | 'year') || 'week';
-    const userId = searchParams.get('userId') || undefined;
 
     const tasks = getTasks();
     const now = new Date();
