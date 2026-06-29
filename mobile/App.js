@@ -13,6 +13,7 @@ import AuthScreen from './screens/AuthScreen';
 import HabitTrackerScreen from './screens/HabitTrackerScreen';
 import GoalTrackerScreen from './screens/GoalTrackerScreen';
 import TimeTrackingScreen from './screens/TimeTrackingScreen';
+import TimeBlockingScreen from './screens/TimeBlockingScreen';
 import AIAssistantScreen from './screens/AIAssistantScreen';
 import TemplateMarketplaceScreen from './screens/TemplateMarketplaceScreen';
 import FocusSessionsScreen from './screens/FocusSessionsScreen';
@@ -72,6 +73,11 @@ export default function App() {
                   name="TimeTracking"
                   component={TimeTrackingScreen}
                   options={{ title: 'Time Tracking' }}
+                />
+                <Stack.Screen
+                  name="TimeBlocking"
+                  component={TimeBlockingScreen}
+                  options={{ title: 'Time Blocking' }}
                 />
                 <Stack.Screen
                   name="AIAssistant"
