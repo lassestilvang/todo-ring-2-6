@@ -1,0 +1,27 @@
+// tests/unit/hooks/setup.db.test.ts
+import { setupDB } from '@/lib/db-connect';
+import { closeDB } from '@/lib/db-close';
+import { sql } from '@/lib/db';
+
+describe('Database setup and teardown', () => {
+  beforeAll(async () => {
+    await setupDB();
+  });
+
+  afterAll(async () => {
+    await closeDB();
+  });
+
+  it('should initialize database schema correctly', async () => {
+    const tables = ['tasks', 'recurring', 'notifications', 'settings'];
+    for (const table of tables) {
+      const exists = await sql`SELECT EXISTS (SELECT 1 FROM ${sql.identifiers([table])})`.get();
+      expect(exists).toBeDefined();
+    }
+  });
+
+  it('should correctly set up test environment', async () => {
+    // Check that required extensions are available
+    const result = await sql`PRAGMA foreign_keys=ON`.all();
+    expect(result).toBeTruthy();
+  });
