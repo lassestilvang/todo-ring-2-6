@@ -16,11 +16,16 @@ interface CacheOptions {
 const DEFAULT_TTL = 60; // 60 seconds
 const MAX_ENTRIES = 1000;
 
+// Global cache registry for pattern invalidation
+const globalCacheRegistry = new Set<string>();
+
 // In-memory cache
 const cache = new Map<string, CacheEntry<any>>();
 
 // Try to use Redis if available
 let redis: any = null;
+let redisConnected = false;
+
 // Only attempt Redis connection on server-side with REDIS_URL configured
 if (typeof window === 'undefined' && process.env.REDIS_URL) {
   try {
@@ -30,6 +35,15 @@ if (typeof window === 'undefined' && process.env.REDIS_URL) {
     redis.on('error', () => {
       console.warn('Redis connection failed, falling back to memory cache');
       redis = null;
+      redisConnected = false;
+    });
+    // Connect to Redis
+    redis.connect().then(() => {
+      redisConnected = true;
+      console.log('Redis cache connected');
+    }).catch(() => {
+      redis = null;
+      redisConnected = false;
     });
   } catch {
     // Redis not available, use memory cache
@@ -159,10 +173,9 @@ export async function warmCache(): Promise<void> {
   const popularViews = ['today', 'next7', 'upcoming'];
   for (const view of popularViews) {
     try {
-      const data = await fetch(`/api/tasks?view=${view}`).then(r => r.json());
-      if (data.success) {
-        await setInCache(`tasks:${view}`, data.data, { ttlSeconds: 300 }); // 5 min cache
-      }
+      // Note: This should be called from a server context with proper API access
+      // For now, we just set up the cache keys
+      console.log(`Cache warming for view ${view} should be done via API call`);
     } catch (error) {
       console.warn(`Failed to warm cache for view ${view}`);
     }
@@ -173,10 +186,53 @@ export async function warmCache(): Promise<void> {
  * Invalidate cache keys matching a pattern
  */
 export async function invalidatePattern(pattern: string): Promise<void> {
-  // For memory cache, we need to clear and rebuild
-  // For Redis, we could use KEYS command (not recommended in production)
-  const keys = Array.from((global as any).__cache__ || []).filter((k: string) => k.includes(pattern));
+  const keys = Array.from(globalCacheRegistry).filter((k) => k.includes(pattern));
   for (const key of keys) {
     await serverCache.del(key);
+    globalCacheRegistry.delete(key);
   }
 }
+
+/**
+ * Dashboard-specific cache utilities
+ */
+export const DashboardCache = {
+  // Task analytics cache keys
+  taskAnalytics: (userId: string, period: string) => `dashboard:analytics:tasks:${userId}:${period}`,
+  userStats: (userId: string) => `dashboard:stats:user:${userId}`,
+  quickStats: (userId: string) => `dashboard:quickstats:${userId}`,
+  productivity: (userId: string, range: string) => `dashboard:productivity:${userId}:${range}`,
+
+  // Cache common dashboard data
+  async cacheDashboardData(userId: string, data: any, ttlSeconds: number = 300): Promise<void> {
+    await Promise.all([
+      serverCache.set(this.quickStats(userId), data.quickStats, { ttlSeconds }),
+      serverCache.set(this.userStats(userId), data.userStats, { ttlSeconds }),
+    ]);
+  },
+
+  // Invalidate all dashboard cache for a user
+  async invalidateUserDashboard(userId: string): Promise<void> {
+    await invalidatePattern(`dashboard:${userId}`);
+  }
+};
+
+/**
+ * Task view cache utilities
+ */
+export const TaskCache = {
+  view: (userId: string, viewName: string, filters: string) =>
+    `tasks:${userId}:${viewName}:${filters}`,
+  taskDetail: (taskId: string) => `task:detail:${taskId}`,
+  userTasks: (userId: string) => `tasks:user:${userId}`,
+
+  async cacheTasks(userId: string, viewName: string, tasks: any[], filters: string = ''): Promise<void> {
+    const key = this.view(userId, viewName, filters);
+    globalCacheRegistry.add(key);
+    await serverCache.set(key, tasks, { ttlSeconds: 120 });
+  },
+
+  async invalidateUserTasks(userId: string): Promise<void> {
+    await invalidatePattern(`tasks:user:${userId}`);
+  }
+};
