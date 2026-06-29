@@ -34,6 +34,18 @@ export class TemplateRepository {
     return this.db.prepare(query).all(...values) as TaskTemplate[];
   }
 
+  findPublic(sortBy?: string, limit: number = 20): TaskTemplate[] {
+    let query = 'SELECT * FROM task_templates WHERE is_public = 1';
+    const values: any[] = [];
+
+    const validSortColumns = ['usage_count', 'avg_rating', 'created_at', 'name'];
+    const sortColumn = sortBy && validSortColumns.includes(sortBy) ? sortBy : 'usage_count';
+    query += ` ORDER BY ${sortColumn} DESC LIMIT ?`;
+    values.push(limit);
+
+    return this.db.prepare(query).all(...values) as TaskTemplate[];
+  }
+
   findByCreatedBy(createdBy: string): TaskTemplate[] {
     return this.db.prepare(
       'SELECT * FROM task_templates WHERE created_by = ? ORDER BY created_at DESC'
@@ -130,13 +142,13 @@ export class TemplateRepository {
     ).all(templateId) as TemplateRating[];
   }
 
-  rateTemplate(templateId: string, rating: number): TemplateRating {
+  rateTemplate(templateId: string, rating: number, userId?: string): TemplateRating {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
     this.db.prepare(
-      'INSERT INTO template_ratings (id, template_id, rating, created_at) VALUES (?, ?, ?, ?)'
-    ).run(id, templateId, rating, now);
+      'INSERT INTO template_ratings (id, template_id, user_id, rating, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run(id, templateId, userId || null, rating, now);
 
     // Update average rating
     const stats = this.db.prepare(
@@ -151,6 +163,18 @@ export class TemplateRepository {
 
     return this.db.prepare('SELECT * FROM template_ratings WHERE id = ?').get(id) as TemplateRating;
   }
+
+  getUserRating(templateId: string, userId: string): TemplateRating | undefined {
+    return this.db.prepare(
+      'SELECT * FROM template_ratings WHERE template_id = ? AND user_id = ?'
+    ).get(templateId, userId) as TemplateRating | undefined;
+  }
+}
+
+// Helper function to get user's rating
+export async function getUserTemplateRating(templateId: string, userId: string): Promise<TemplateRating | null> {
+  const repo = getTemplateRepository();
+  return repo.getUserRating(templateId, userId) || null;
 }
 
 let templateRepository: TemplateRepository | null = null;
