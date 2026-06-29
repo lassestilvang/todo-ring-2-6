@@ -1,0 +1,11 @@
+# Backup cron configuration
+# Add this to your crontab (crontab -e) or use systemd timers
+
+# Daily backup at 2:00 AM
+0 2 * * * cd /path/to/taskplanner && npm run backup
+
+# Weekly backup on Sunday at 1:00 AM (more frequent backup)
+0 1 * * 0 cd /path/to/taskplanner && npm run backup
+
+# Monthly backup on 1st at midnight
+0 0 1 * * cd /path/to/taskplanner && npm run backup
