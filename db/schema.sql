@@ -631,14 +631,44 @@ CREATE TABLE IF NOT EXISTS URIs (
 
 CREATE INDEX IF NOT EXISTS idx_uris_uri ON URIs(uri);
 CREATE INDEX IF NOT EXISTS idx_uris_functions ON URIs(functions);
--- URIs table with functions column
-CREATE TABLE IF NOT EXISTS URIs (
+
+-- Time Blocks table for scheduling
+CREATE TABLE IF NOT EXISTS time_blocks (
     id TEXT PRIMARY KEY,
-    uri TEXT NOT NULL UNIQUE,
-    functions TEXT DEFAULT '[]',
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    start_time TEXT NOT NULL, -- ISO datetime
+    end_time TEXT NOT NULL, -- ISO datetime
+    task_id TEXT, -- Optional linked task
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_uris_uri ON URIs(uri);
-CREATE INDEX IF NOT EXISTS idx_uris_functions ON URIs(functions);
+CREATE INDEX IF NOT EXISTS idx_time_blocks_user ON time_blocks(user_id);
+CREATE INDEX IF NOT EXISTS idx_time_blocks_date ON time_blocks(date(start_time), date(end_time));
+CREATE INDEX IF NOT EXISTS idx_time_blocks_task ON time_blocks(task_id);
+
+-- Task Batches table (projects/orders)
+CREATE TABLE IF NOT EXISTS task_batches (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    color TEXT DEFAULT '#3b82f6',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_batches_user ON task_batches(user_id);
+
+-- Batch-Tasks junction table
+CREATE TABLE IF NOT EXISTS batch_tasks (
+    id TEXT PRIMARY KEY,
+    batch_id TEXT NOT NULL REFERENCES task_batches(id) ON DELETE CASCADE,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(batch_id, task_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_tasks_batch ON batch_tasks(batch_id);
+CREATE INDEX IF NOT EXISTS idx_batch_tasks_task ON batch_tasks(task_id);
