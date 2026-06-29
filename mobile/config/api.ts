@@ -40,6 +40,14 @@ export const ENDPOINTS = {
   exportScheduled: `${API_URL}/api/export/scheduled`,
   import: `${API_URL}/api/import`,
   savedViews: `${API_URL}/api/saved-views`,
+  // New endpoints for mobile parity
+  timeBlocking: `${API_URL}/api/time-blocking`,
+  calendar: `${API_URL}/api/calendar`,
+  pushSubscription: `${API_URL}/api/push-subscription`,
+  taskHistory: `${API_URL}/api/task-history`,
+  recurringExceptions: `${API_URL}/api/recurring/exceptions`,
+  goalProgress: `${API_URL}/api/goals/progress`,
+  taskBatches: `${API_URL}/api/task-batches`,
 };
 
 export const getAuthHeaders = (token: string) => ({
