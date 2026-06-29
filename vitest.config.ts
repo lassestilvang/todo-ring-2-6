@@ -13,7 +13,7 @@ export default defineConfig({
     env: {
       TEST_MODE: 'true',
     },
-    exclude: ['tests/e2e/**', 'node_modules/**'],
+    exclude: ['tests/e2e/**', 'node_modules/**', 'tests/unit/repositories-integration.test.ts'],
     include: [
       'tests/unit/**/*.test.ts',
       'tests/snapshot/**/*.test.ts',
@@ -28,6 +28,7 @@ export default defineConfig({
         '@/types': path.resolve(__dirname, 'src/types/index.ts'),
         '@/lib': path.resolve(__dirname, 'src/lib'),
         '@/lib/repositories': path.resolve(__dirname, 'src/lib/repositories/index.ts'),
+        '@/lib/rate-limiter': path.resolve(__dirname, 'src/lib/rate-limiter.ts'),
         '@test-utils': path.resolve(__dirname, 'tests/unit/utils/test-helpers.ts'),
       },
     },

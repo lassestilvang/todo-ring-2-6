@@ -35,6 +35,9 @@
       ],
       "@/lib": [
         "./src/lib/*"
+      ],
+      "@/lib/rate-limiter": [
+        "./src/lib/rate-limiter.ts"
       ]
     },
     "allowJs": true,
