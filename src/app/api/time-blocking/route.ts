@@ -1,202 +1,111 @@
 /**
- * Time Blocking API Route
- * Manages time blocks for scheduling tasks
+ * Time Blocking API Route (v2)
+ * Manages time blocks for scheduling tasks with versioning support
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { withMiddleware } from '@/lib/api-middleware';
-import { getDb } from '@/lib/db-client';
-import { v4 as uuidv4 } from 'uuid';
+import { createTimeBlock, getTimeBlocks, getTimeBlocksForDate, updateTimeBlock, deleteTimeBlock, checkConflicts, getAvailableSlots, scheduleTask } from '@/services/time-blocking-service';
+import { withApiVersioning, addVersionHeaders } from '@/lib/api-wrapper';
 import { z } from 'zod';
 
 const createTimeBlockSchema = z.object({
   title: z.string().min(1, 'Title is required'),
-  start_time: z.string().datetime('Invalid start time'),
-  end_time: z.string().datetime('Invalid end time'),
-  task_id: z.string().optional(),
+  startTime: z.string().datetime('Invalid start time'),
+  endTime: z.string().datetime('Invalid end time'),
+  taskId: z.string().optional(),
 });
 
 const updateTimeBlockSchema = z.object({
   title: z.string().min(1, 'Title is required').optional(),
-  start_time: z.string().datetime('Invalid start time').optional(),
+  startTime: z.string().datetime('Invalid start time').optional(),
   end_time: z.string().datetime('Invalid end time').optional(),
-  task_id: z.string().optional(),
+  taskId: z.string().optional(),
 });
 
-// GET - List time blocks (optionally filtered by date)
-async function GET(req: NextRequest) {
+export const GET = withApiVersioning(async (req: NextRequest) => {
   const searchParams = req.nextUrl.searchParams;
   const date = searchParams.get('date');
-  const userId = req.headers.get('x-user-id');
+  const userId = req.headers.get('x-user-id') || 'demo-user';
 
-  const db = getDb();
+  let timeBlocks: any[];
 
   if (date) {
-    // Get time blocks for a specific date
-    const timeBlocks = db
-      .prepare(`
-        SELECT tb.*, t.title as task_title
-        FROM time_blocks tb
-        LEFT JOIN tasks t ON tb.task_id = t.id
-        WHERE tb.user_id = ? AND date(tb.start_time) = date(tb.end_time) AND date(tb.start_time) = ?
-        ORDER BY tb.start_time ASC
-      `)
-      .all(userId, date);
-
-    return NextResponse.json({
-      success: true,
-      data: timeBlocks,
-    });
+    timeBlocks = getTimeBlocksForDate(userId, date);
   } else {
-    // Get all time blocks for user
-    const timeBlocks = db
-      .prepare(`
-        SELECT tb.*, t.title as task_title
-        FROM time_blocks tb
-        LEFT JOIN tasks t ON tb.task_id = t.id
-        WHERE tb.user_id = ?
-        ORDER BY tb.start_time ASC
-      `)
-      .all(userId);
-
-    return NextResponse.json({
-      success: true,
-      data: timeBlocks,
-    });
+    timeBlocks = getTimeBlocks(userId);
   }
-}
 
-// POST - Create a new time block
-async function POST(req: NextRequest) {
+  return { success: true, data: timeBlocks };
+});
+
+export const POST = withApiVersioning(async (req: NextRequest) => {
   const body = await req.json();
-  const validated = createTimeBlockSchema.parse(body);
-  const userId = req.headers.get('x-user-id');
+  const userId = req.headers.get('x-user-id') || 'demo-user';
 
-  const db = getDb();
-  const id = uuidv4();
+  const validated = createTimeBlockSchema.safeParse(body);
+  if (!validated.success) {
+    return {
+      success: false,
+      error: validated.error.errors.map(e => e.message).join(', '),
+      code: 'VALIDATION_ERROR'
+    };
+  }
 
-  const stmt = db.prepare(`
-    INSERT INTO time_blocks (id, user_id, title, start_time, end_time, task_id)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
+  // Check for conflicts
+  const conflicts = checkConflicts(userId, validated.data.startTime, validated.data.endTime);
+  if (conflicts.length > 0) {
+    return {
+      success: false,
+      error: 'Time slot conflicts with existing schedule',
+      code: 'SCHEDULING_CONFLICT',
+      data: conflicts
+    };
+  }
 
-  stmt.run(id, userId, validated.title, validated.start_time, validated.end_time, validated.task_id);
+  const timeBlock = createTimeBlock(userId, validated.data);
+  return { success: true, data: timeBlock };
+});
 
-  const timeBlock = db
-    .prepare(`
-      SELECT tb.*, t.title as task_title
-      FROM time_blocks tb
-      LEFT JOIN tasks t ON tb.task_id = t.id
-      WHERE tb.id = ?
-    `)
-    .get(id);
-
-  return NextResponse.json(
-    { success: true, data: timeBlock },
-    { status: 201 }
-  );
-}
-
-// PUT - Update a time block
-async function PUT(req: NextRequest) {
+export const PUT = withApiVersioning(async (req: NextRequest) => {
   const searchParams = req.nextUrl.searchParams;
   const id = searchParams.get('id');
+  const userId = req.headers.get('x-user-id') || 'demo-user';
 
   if (!id) {
-    return NextResponse.json(
-      { success: false, error: 'ID is required' },
-      { status: 400 }
-    );
+    return { success: false, error: 'ID is required', code: 'MISSING_ID' };
   }
 
   const body = await req.json();
-  const validated = updateTimeBlockSchema.parse(body);
-  const userId = req.headers.get('x-user-id');
-
-  const db = getDb();
-
-  // Check if time block exists and belongs to user
-  const existing = db.prepare('SELECT * FROM time_blocks WHERE id = ? AND user_id = ?').get(id, userId);
-
-  if (!existing) {
-    return NextResponse.json(
-      { success: false, error: 'Time block not found' },
-      { status: 404 }
-    );
+  const validated = updateTimeBlockSchema.safeParse(body);
+  if (!validated.success) {
+    return {
+      success: false,
+      error: validated.error.errors.map(e => e.message).join(', '),
+      code: 'VALIDATION_ERROR'
+    };
   }
 
-  // Build update query dynamically
-  const updates: string[] = [];
-  const values: any[] = [];
-
-  if (validated.title !== undefined) {
-    updates.push('title = ?');
-    values.push(validated.title);
-  }
-  if (validated.start_time !== undefined) {
-    updates.push('start_time = ?');
-    values.push(validated.start_time);
-  }
-  if (validated.end_time !== undefined) {
-    updates.push('end_time = ?');
-    values.push(validated.end_time);
-  }
-  if (validated.task_id !== undefined) {
-    updates.push('task_id = ?');
-    values.push(validated.task_id);
+  const timeBlock = updateTimeBlock(id, userId, validated.data);
+  if (!timeBlock) {
+    return { success: false, error: 'Time block not found', code: 'NOT_FOUND' };
   }
 
-  if (updates.length === 0) {
-    return NextResponse.json({ success: true, data: existing });
-  }
+  return { success: true, data: timeBlock };
+});
 
-  values.push(id, userId);
-
-  db.prepare(`
-    UPDATE time_blocks
-    SET ${updates.join(', ')}, updated_at = datetime('now')
-    WHERE id = ? AND user_id = ?
-  `).run(...values);
-
-  const updated = db
-    .prepare(`
-      SELECT tb.*, t.title as task_title
-      FROM time_blocks tb
-      LEFT JOIN tasks t ON tb.task_id = t.id
-      WHERE tb.id = ?
-    `)
-    .get(id);
-
-  return NextResponse.json({ success: true, data: updated });
-}
-
-// DELETE - Delete a time block
-async function DELETE(req: NextRequest) {
+export const DELETE = withApiVersioning(async (req: NextRequest) => {
   const searchParams = req.nextUrl.searchParams;
   const id = searchParams.get('id');
-  const userId = req.headers.get('x-user-id');
+  const userId = req.headers.get('x-user-id') || 'demo-user';
 
   if (!id) {
-    return NextResponse.json(
-      { success: false, error: 'ID is required' },
-      { status: 400 }
-    );
+    return { success: false, error: 'ID is required', code: 'MISSING_ID' };
   }
 
-  const db = getDb();
-
-  const result = db.prepare(
-    'DELETE FROM time_blocks WHERE id = ? AND user_id = ?'
-  ).run(id, userId);
-
-  if (result.changes === 0) {
-    return NextResponse.json(
-      { success: false, error: 'Time block not found' },
-      { status: 404 }
-    );
+  const deleted = deleteTimeBlock(id, userId);
+  if (!deleted) {
+    return { success: false, error: 'Time block not found', code: 'NOT_FOUND' };
   }
 
-  return NextResponse.json({ success: true, message: 'Time block deleted' });
-}
-
-export { GET, POST, PUT, DELETE };
+  return { success: true, data: { message: 'Time block deleted' } };
+});
