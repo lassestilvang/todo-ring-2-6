@@ -5,7 +5,11 @@
  */
 
 import { getDb } from './db-client';
-import { v4 as uuidv4 } from 'uuid';
+
+// Generate UUID using crypto (Node 14+)
+function generateUUID(): string {
+  return crypto.randomUUID();
+}
 
 // Type imports
 import type { Task, List, Label, Subtask, TaskTemplate, TemplateRating, Goal, User } from '../src/types/index';
@@ -31,7 +35,7 @@ export function getInboxList(): List | undefined {
 
 export function createList(data: { name: string; color?: string; emoji?: string }): List {
   const db = getDb();
-  const id = uuidv4();
+  const id = generateUUID();
   const now = new Date().toISOString();
   const stmt = db.prepare(
     'INSERT INTO lists (id, name, color, emoji, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
@@ -124,7 +128,7 @@ export function getUpcomingTasks(): Task[] {
 
 export function createTask(data: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Task {
   const db = getDb();
-  const id = uuidv4();
+  const id = generateUUID();
   const now = new Date().toISOString();
   const stmt = db.prepare(
     `INSERT INTO tasks (id, title, description, list_id, date, deadline, priority, status,
@@ -196,7 +200,7 @@ export function getTemplateRatings(templateId: string): TemplateRating[] {
 
 export function rateTemplate(templateId: string, rating: number, userId?: string): TemplateRating {
   const db = getDb();
-  const id = uuidv4();
+  const id = generateUUID();
   const now = new Date().toISOString();
 
   db.prepare('INSERT INTO template_ratings (id, template_id, user_id, rating, created_at) VALUES (?, ?, ?, ?, ?)').run(
@@ -217,7 +221,7 @@ export function getTemplateById(id: string): TaskTemplate | undefined {
 
 export function createTemplate(data: Omit<TaskTemplate, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'avgRating'>): TaskTemplate {
   const db = getDb();
-  const id = uuidv4();
+  const id = generateUUID();
   const now = new Date().toISOString();
   const stmt = db.prepare(
     'INSERT INTO task_templates (id, name, title, description, priority, estimate_hours, estimate_minutes, is_all_day, recurring_type, label_ids, category, created_by, created_at, updated_at, usage_count, avg_rating) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)'
@@ -249,7 +253,7 @@ export function getGoalById(id: string): Goal | undefined {
 
 export function createGoal(data: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>): Goal {
   const db = getDb();
-  const id = uuidv4();
+  const id = generateUUID();
   const now = new Date().toISOString();
   const stmt = db.prepare(
     'INSERT INTO goals (id, user_id, title, description, target_value, unit, period, category, color, current_value, start_date, end_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -434,7 +438,7 @@ export function deleteTaskComment(id: string): void {
 // === Mention Operations ===
 export function addCommentMention(commentId: string, userId: string, userName: string): any {
   const db = getDb();
-  const id = uuidv4();
+  const id = generateUUID();
   const now = new Date().toISOString();
   db.prepare('INSERT INTO comment_mentions (id, comment_id, user_id, user_name, created_at) VALUES (?, ?, ?, ?, ?)').run(
     id, commentId, userId, userName, now
@@ -494,11 +498,12 @@ export function updateHabitStreakOnComplete(taskId: string): any {
   const db = getDb();
   const streak = db.prepare('SELECT * FROM habit_streaks WHERE task_id = ?').get(taskId) as any;
   const now = new Date().toISOString();
+  const today = new Date().toISOString().split('T')[0];
 
   if (!streak) {
     return db.prepare(
       'INSERT INTO habit_streaks (id, task_id, current_streak, longest_streak, last_completed, created_at, updated_at) VALUES (?, ?, 1, 1, ?, ?, ?)'
-    ).run(uuidv4(), taskId, now, now, new Date().toISOString());
+    ).run(generateUUID(), taskId, now, now, new Date().toISOString());
   }
 
   const newStreak = streak.last_completed === today ? streak.current_streak : streak.current_streak + 1;
@@ -514,4 +519,197 @@ export function resetHabitStreak(taskId: string): void {
   db.prepare('UPDATE habit_streaks SET current_streak = 0, streak_start = ? WHERE task_id = ?').run(
     new Date().toISOString(), taskId
   );
+}
+
+// === Refresh Token Operations ===
+export function createRefreshToken(userId: string): any {
+  const db = getDb();
+  const id = generateUUID();
+  const token = generateUUID();
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  db.prepare(
+    'INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).run(id, userId, token, expiresAt, now);
+
+  return { id, userId, token, expiresAt, createdAt: now };
+}
+
+export function findRefreshToken(id: string): any {
+  const db = getDb();
+  return db.prepare('SELECT * FROM refresh_tokens WHERE id = ?').get(id);
+}
+
+export function findRefreshTokenByToken(token: string): any {
+  const db = getDb();
+  return db.prepare('SELECT * FROM refresh_tokens WHERE token = ?').get(token);
+}
+
+export function deleteRefreshToken(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM refresh_tokens WHERE id = ?').run(id);
+}
+
+export function deleteRefreshTokenByToken(token: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM refresh_tokens WHERE token = ?').run(token);
+}
+
+export function deleteRefreshTokensByUserId(userId: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM refresh_tokens WHERE user_id = ?').run(userId);
+}
+
+export function deleteExpiredRefreshTokens(): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare('DELETE FROM refresh_tokens WHERE expires_at < ?').run(now);
+}
+
+// === Subtask Operations ===
+export function getSubtasks(taskId: string): any[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM subtasks WHERE task_id = ? ORDER BY sort_order ASC').all(taskId);
+}
+
+export function createSubtask(taskId: string, title: string): any {
+  const db = getDb();
+  const id = generateUUID();
+  const now = new Date().toISOString();
+  db.prepare('INSERT INTO subtasks (id, task_id, title, is_completed, sort_order, created_at) VALUES (?, ?, ?, 0, 0, ?)').run(id, taskId, title, now);
+  return { id, taskId, title, isCompleted: false, sortOrder: 0, createdAt: now };
+}
+
+export function toggleSubtask(id: string): any {
+  const db = getDb();
+  const subtask = db.prepare('SELECT * FROM subtasks WHERE id = ?').get(id);
+  if (!subtask) return null;
+  db.prepare('UPDATE subtasks SET is_completed = NOT is_completed, updated_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+  return db.prepare('SELECT * FROM subtasks WHERE id = ?').get(id);
+}
+
+export function deleteSubtask(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM subtasks WHERE id = ?').run(id);
+}
+
+export function updateTaskSortOrder(id: string, sortOrder: number): void {
+  const db = getDb();
+  db.prepare('UPDATE tasks SET sort_order = ?, updated_at = ? WHERE id = ?').run(sortOrder, new Date().toISOString(), id);
+}
+
+// === Label Operations ===
+export function getAllLabels(): any[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM labels ORDER BY name ASC').all();
+}
+
+export function getLabelById(id: string): any {
+  const db = getDb();
+  return db.prepare('SELECT * FROM labels WHERE id = ?').get(id);
+}
+
+export function createLabel(name: string, color: string, icon: string = '🏷'): any {
+  const db = getDb();
+  const id = generateUUID();
+  const now = new Date().toISOString();
+  db.prepare('INSERT INTO labels (id, name, color, icon, created_at) VALUES (?, ?, ?, ?, ?)').run(id, name, color, icon, now);
+  return { id, name, color, icon, createdAt: now };
+}
+
+export function deleteLabel(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM labels WHERE id = ?').run(id);
+}
+
+export function updateLabel(id: string, data: Partial<any>): any {
+  const db = getDb();
+  const updates = Object.entries(data).map(([k]) => `${k} = ?`).join(', ');
+  const values = [...Object.values(data), id];
+  db.prepare(`UPDATE labels SET ${updates}, updated_at = ? WHERE id = ?`).run(...values, new Date().toISOString(), id);
+  return db.prepare('SELECT * FROM labels WHERE id = ?').get(id);
+}
+
+// === Task-Label Operations ===
+export function getTaskLabels(taskId: string): any[] {
+  const db = getDb();
+  return db.prepare('SELECT label_id FROM task_labels WHERE task_id = ?').all(taskId).map((r: any) => r.label_id);
+}
+
+export function getTasksByLabel(labelId: string): Task[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT t.* FROM tasks t
+    JOIN task_labels tl ON t.id = tl.task_id
+    WHERE tl.label_id = ?
+  `).all(labelId) as Task[];
+}
+
+export function getTasksByLabels(labelIds: string[]): Task[] {
+  const db = getDb();
+  const placeholders = labelIds.map(() => '?').join(',');
+  return db.prepare(`
+    SELECT t.* FROM tasks t
+    JOIN task_labels tl ON t.id = tl.task_id
+    WHERE tl.label_id IN (${placeholders})
+  `).all(...labelIds) as Task[];
+}
+
+export function addLabelToTask(taskId: string, labelId: string): void {
+  const db = getDb();
+  const id = generateUUID();
+  db.prepare('INSERT OR IGNORE INTO task_labels (id, task_id, label_id) VALUES (?, ?, ?)').run(id, taskId, labelId);
+}
+
+export function removeLabelFromTask(taskId: string, labelId: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM task_labels WHERE task_id = ? AND label_id = ?').run(taskId, labelId);
+}
+
+// === Task History Operations ===
+export function addTaskHistory(taskId: string, action: string, fieldChanged?: string, oldValue?: string, newValue?: string): any {
+  const db = getDb();
+  const id = generateUUID();
+  const now = new Date().toISOString();
+  db.prepare('INSERT INTO task_history (id, task_id, action, field_changed, old_value, new_value, performed_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, taskId, action, fieldChanged, oldValue, newValue, now);
+  return { id, taskId, action, fieldChanged, oldValue, newValue, performedAt: now };
+}
+
+export function getTaskHistory(taskId: string): any[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM task_history WHERE task_id = ? ORDER BY performed_at DESC').all(taskId);
+}
+
+// === Attachment Operations ===
+export function getAttachments(taskId: string): any[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM attachments WHERE task_id = ? ORDER BY created_at DESC').all(taskId);
+}
+
+export function createAttachment(taskId: string, filename: string, fileType?: string, fileSize?: number, filePath?: string): any {
+  const db = getDb();
+  const id = generateUUID();
+  const now = new Date().toISOString();
+  db.prepare('INSERT INTO attachments (id, task_id, filename, file_type, file_size, file_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, taskId, filename, fileType, fileSize, filePath, now);
+  return { id, taskId, filename, fileType, fileSize, filePath, createdAt: now };
+}
+
+export function deleteAttachment(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM attachments WHERE id = ?').run(id);
+}
+
+// === Comment Operations ===
+export function getTaskComments(taskId: string): any[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM task_comments WHERE task_id = ? ORDER BY created_at DESC').all(taskId);
+}
+
+export function createTaskComment(taskId: string, userId: string, userName: string, content: string): any {
+  const db = getDb();
+  const id = generateUUID();
+  const now = new Date().toISOString();
+  db.prepare('INSERT INTO task_comments (id, task_id, user_id, user_name, content, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, taskId, userId, userName, content, now);
+  return { id, taskId, userId, userName, content, createdAt: now };
 }
