@@ -16,6 +16,16 @@ vi.mock('next/server', () => ({
   },
 }));
 
+// Mock rate-limiter
+vi.mock('../../src/lib/rate-limiter', () => ({
+  rateLimit: vi.fn(() => ({
+    success: true,
+    limit: 100,
+    remaining: 99,
+    reset: Date.now() + 60000,
+  })),
+}));
+
 describe('Middleware - Comprehensive', () => {
   let middleware: (request: any) => Response;
   let mockNext: ReturnType<typeof vi.fn>;
