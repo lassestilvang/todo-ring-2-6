@@ -459,3 +459,19 @@ export const RefreshTokenSchema = z.object({
 });
 
 export type RefreshToken = z.infer<typeof RefreshTokenSchema>;
+
+// === Focus Session Schema ===
+export const FocusSessionSchema = z.object({
+  id: z.string(),
+  taskId: z.string().nullable().optional(),
+  userId: z.string(),
+  duration: z.number().min(1, 'Duration must be at least 1 minute'),
+  startedAt: z.string(),
+  completedAt: z.string().nullable().optional(),
+  status: z.enum(['active', 'completed', 'cancelled']).default('active'),
+  isPomodoro: z.boolean().default(false),
+  pomodorosCompleted: z.number().default(0),
+  breaksTaken: z.number().default(0),
+});
+
+export type FocusSession = z.infer<typeof FocusSessionSchema>;
