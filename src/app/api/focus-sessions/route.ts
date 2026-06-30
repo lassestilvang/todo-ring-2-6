@@ -1,72 +1,93 @@
-import { NextRequest } from 'next/server';
-import { ensureDbInitialized } from '@/lib/db-init';
-import { getFocusSessionRepository } from '@/lib/repositories';
-import { jsonSuccess, jsonError, jsonValidationError } from '@/lib/api-response';
-import { FocusSessionSchema } from '@/lib/validations';
+/**
+ * Focus Sessions API Route (v2)
+ * Manages Pomodoro sessions and focus time tracking
+ */
 
-ensureDbInitialized();
-const focusSessionRepository = getFocusSessionRepository();
+import { NextRequest, NextResponse } from 'next/server';
+import { getFocusSessions, getFocusStats, getTodayFocusMinutes, startFocusSession, completeFocusSession, cancelFocusSession, completePomodoro, recordBreak } from '@/services/focus-sessions-service';
+import { withApiVersioning, addVersionHeaders } from '@/lib/api-wrapper';
+import { z } from 'zod';
 
-// POST /api/focus-sessions - Start a focus session
-export async function POST(_req: NextRequest) {
-  try {
-    const body = await _req.json();
-    const validated = FocusSessionSchema.safeParse(body);
+const createSessionSchema = z.object({
+  taskId: z.string().optional(),
+  duration: z.number().min(1, 'Duration must be at least 1 minute'),
+  isPomodoro: z.boolean().default(false)
+});
 
-    if (!validated.success) {
-      return jsonValidationError(
-        validated.error.errors.map(e => ({ path: e.path, message: e.message }))
-      );
-    }
+export const GET = withApiVersioning(async (req: NextRequest) => {
+  const searchParams = req.nextUrl.searchParams;
+  const userId = req.headers.get('x-user-id') || 'demo-user';
+  const date = searchParams.get('date') || undefined;
+  const status = searchParams.get('status') as any;
+  const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
 
-    const session = focusSessionRepository.create({
-      userId: validated.data.userId,
-      taskId: validated.data.taskId,
-      duration: validated.data.duration,
-      startedAt: new Date().toISOString(),
-      status: 'active',
-    });
+  // Stats endpoint
+  if (searchParams.get('stats')) {
+    const period = searchParams.get('period') as 'day' | 'week' | 'month' || 'week';
+    const stats = getFocusStats(userId, period);
+    const todayMinutes = getTodayFocusMinutes(userId);
 
-    return jsonSuccess(session, 201);
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to start focus session';
-    return jsonError(message, 500, 'FOCUS_ERROR');
+    return {
+      success: true,
+      data: {
+        ...stats,
+        todayMinutes
+      }
+    };
   }
-}
 
-// PUT /api/focus-sessions - Complete a focus session
-export async function PUT(_req: NextRequest) {
-  try {
-    const body = await _req.json();
-    const { id, status } = body;
+  const sessions = getFocusSessions(userId, { date, status, limit });
+  return { success: true, data: sessions };
+});
 
-    if (!id) {
-      return jsonError('Session ID is required', 400, 'MISSING_ID');
-    }
+export const POST = withApiVersioning(async (req: NextRequest) => {
+  const body = await req.json();
+  const userId = req.headers.get('x-user-id') || 'demo-user';
 
-    const session = focusSessionRepository.update(id, { status: status || 'completed' });
-    return jsonSuccess(session);
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to complete focus session';
-    return jsonError(message, 500, 'FOCUS_ERROR');
+  const validated = createSessionSchema.safeParse(body);
+  if (!validated.success) {
+    return {
+      success: false,
+      error: validated.error.errors.map(e => e.message).join(', '),
+      code: 'VALIDATION_ERROR'
+    };
   }
-}
 
-// GET /api/focus-sessions - Get focus sessions
-export async function GET(_req: NextRequest) {
-  try {
-    const { searchParams } = new URL(_req.url);
-    const userId = searchParams.get('userId');
-    const limit = parseInt(searchParams.get('limit') || '10');
+  const session = startFocusSession(userId, validated.data);
+  return { success: true, data: session };
+});
 
-    if (!userId) {
-      return jsonError('userId is required', 400, 'MISSING_USER_ID');
-    }
+export const PATCH = withApiVersioning(async (req: NextRequest) => {
+  const searchParams = req.nextUrl.searchParams;
+  const id = searchParams.get('id');
+  const action = searchParams.get('action');
+  const userId = req.headers.get('x-user-id') || 'demo-user';
 
-    const sessions = focusSessionRepository.findAll(userId, limit);
-    return jsonSuccess(sessions);
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch sessions';
-    return jsonError(message, 500, 'FOCUS_ERROR');
+  if (!id || !action) {
+    return { success: false, error: 'ID and action are required', code: 'MISSING_PARAMS' };
   }
-}
+
+  let result: any;
+  switch (action) {
+    case 'complete':
+      result = completeFocusSession(id, userId);
+      break;
+    case 'cancel':
+      result = cancelFocusSession(id, userId);
+      break;
+    case 'pomodoro':
+      result = completePomodoro(id, userId);
+      break;
+    case 'break':
+      result = recordBreak(id, userId);
+      break;
+    default:
+      return { success: false, error: `Unknown action: ${action}`, code: 'INVALID_ACTION' };
+  }
+
+  if (!result) {
+    return { success: false, error: 'Session not found', code: 'NOT_FOUND' };
+  }
+
+  return { success: true, data: result };
+});
