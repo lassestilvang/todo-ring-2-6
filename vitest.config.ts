@@ -29,6 +29,7 @@ export default defineConfig({
         '@/lib': path.resolve(__dirname, 'src/lib'),
         '@/lib/repositories': path.resolve(__dirname, 'src/lib/repositories/index.ts'),
         '@/lib/rate-limiter': path.resolve(__dirname, 'src/lib/rate-limiter.ts'),
+        '@/lib/server-cache': path.resolve(__dirname, 'src/lib/server-cache.ts'),
         '@test-utils': path.resolve(__dirname, 'tests/unit/utils/test-helpers.ts'),
       },
     },
