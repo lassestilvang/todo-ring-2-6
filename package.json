@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "docs": "swagger-ui-express ./openapi.yaml",
+    "docs:generate": "tsx scripts/generate-api-docs.ts",
+    "storybook": "storybook dev",
+    "storybook:build": "storybook build",
     "build": "next build",
     "dev": "next dev",
     "start": "next start",
@@ -76,6 +80,10 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@storybook/addon-a11y": "^8.0.0",
+    "@storybook/addon-interactions": "^8.0.0",
+    "@storybook/addon-essentials": "^8.0.0",
+    "@storybook/react-vite": "^8.0.0",
     "@axe-core/playwright": "^4.11.3",
     "@axe-core/react": "^4.11.3",
     "@hookform/resolvers": "5.4.0",
