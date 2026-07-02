@@ -1,6 +1,6 @@
 /**
  * Rate limiting utility
- * Uses in-memory store (for production, use Redis)
+ * Uses in-memory store with optional Redis support
  */
 
 interface RateLimitStore {
@@ -13,6 +13,23 @@ interface RateLimitStore {
 const store: RateLimitStore = {};
 const DEFAULT_WINDOW = 60_000; // 1 minute
 const DEFAULT_LIMIT = 100;
+
+// Redis client for distributed rate limiting
+let redis: any = null;
+
+if (process.env.REDIS_URL) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const redisClient = require('redis');
+    redis = redisClient.createClient({ url: process.env.REDIS_URL });
+    redis.connect().catch(() => {
+      console.warn('Redis connection failed, using in-memory rate limiting');
+      redis = null;
+    });
+  } catch {
+    // Redis not available
+  }
+}
 
 export interface RateLimitResult {
   success: boolean;
@@ -32,14 +49,18 @@ export function rateLimit(
   const now = Date.now();
   const resetTime = now + windowMs;
 
-  // Get or create entry
+  // Use Redis if available
+  if (redis) {
+    return rateLimitRedis(key, limit, windowMs);
+  }
+
+  // Fall back to in-memory store
   let entry = store[key];
   if (!entry || entry.resetTime < now) {
     entry = { count: 0, resetTime };
     store[key] = entry;
   }
 
-  // Check limit
   if (entry.count >= limit) {
     return {
       success: false,
@@ -49,7 +70,6 @@ export function rateLimit(
     };
   }
 
-  // Increment counter
   entry.count++;
 
   return {
@@ -57,6 +77,44 @@ export function rateLimit(
     limit,
     remaining: limit - entry.count,
     reset: entry.resetTime,
+  };
+}
+
+/**
+ * Redis-based rate limiting for distributed systems
+ */
+async function rateLimitRedis(
+  key: string,
+  limit: number,
+  windowMs: number
+): Promise<RateLimitResult> {
+  const redisKey = `rate_limit:${key}`;
+  const now = Date.now();
+  const resetTime = Math.ceil(now / windowMs) * windowMs;
+
+  // Use Redis transactions for atomic operations
+  const multi = redis.multi();
+  multi.incr(redisKey);
+  multi.expire(redisKey, Math.ceil(windowMs / 1000));
+  const results = await multi.exec();
+
+  const currentCount = results![0][1] as number;
+  const remaining = Math.max(0, limit - currentCount);
+
+  if (currentCount > limit) {
+    return {
+      success: false,
+      limit,
+      remaining: 0,
+      reset: resetTime,
+    };
+  }
+
+  return {
+    success: true,
+    limit,
+    remaining,
+    reset: resetTime,
   };
 }
 
