@@ -1,19 +1,67 @@
 import { NextRequest } from 'next/server';
 import { ensureDbInitialized } from '@/lib/db-init';
-import { getTimeEntryRepository } from '@/lib/repositories';
+import { getTimeEntryRepository, getTaskRepository } from '@/lib/repositories';
 import { jsonSuccess, jsonError, jsonValidationError } from '@/lib/api-response';
 import { TimeEntrySchema } from '@/lib/validations';
 import { ErrorCodes } from '@/lib/error-codes';
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
 ensureDbInitialized();
 const timeEntryRepository = getTimeEntryRepository();
+const taskRepository = getTaskRepository();
 
-// GET /api/time-entries?taskId=xxx
+// GET /api/time-entries?taskId=xxx&period=30d|7d|week|month
 export async function GET(_req: NextRequest) {
   try {
     const { searchParams } = new URL(_req.url);
     const taskId = searchParams.get('taskId');
+    const period = searchParams.get('period') as '7d' | '30d' | 'week' | 'month' | null;
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
 
+    // If period or date range is specified, return report data
+    if (period || (from && to)) {
+      let startDate: Date;
+      let endDate: Date;
+
+      if (from && to) {
+        startDate = new Date(from);
+        endDate = new Date(to);
+      } else {
+        const now = new Date();
+        switch (period) {
+          case '7d':
+            startDate = subDays(now, 7);
+            endDate = now;
+            break;
+          case 'week':
+            startDate = startOfWeek(now);
+            endDate = endOfWeek(now);
+            break;
+          case 'month':
+            startDate = startOfMonth(now);
+            endDate = endOfMonth(now);
+            break;
+          default:
+            startDate = subDays(now, 30);
+            endDate = now;
+        }
+      }
+
+      const entries = timeEntryRepository.findInRange(startDate, endDate);
+      const tasks = taskRepository.getAllTasks();
+      const taskMap = new Map(tasks.map(t => [t.id, t]));
+
+      // Enrich entries with task titles
+      const enrichedEntries = entries.map(entry => ({
+        ...entry,
+        taskTitle: taskMap.get(entry.taskId)?.title || 'Unknown Task',
+      }));
+
+      return jsonSuccess(enrichedEntries);
+    }
+
+    // Default: get entries by taskId
     if (!taskId) {
       return jsonError('Task ID is required', 400, ErrorCodes.MISSING_REQUIRED_FIELD);
     }
