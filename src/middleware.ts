@@ -1,9 +1,45 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { rateLimit } from './lib/rate-limiter';
+import { extractApiVersion, SUPPORTED_VERSIONS } from './lib/api-versioning';
+import { addSecurityHeaders, addCorsHeaders } from './middleware/security-headers';
 
-// Protected API routes that require authentication
+// Protected API routes that require authentication (v1)
 const PROTECTED_ROUTES = [
+  '/api/v1/tasks',
+  '/api/v1/lists',
+  '/api/v1/labels',
+  '/api/v1/subtasks',
+  '/api/v1/comments',
+  '/api/v1/sharing',
+  '/api/v1/export',
+  '/api/v1/analytics',
+];
+
+// Protected API routes for v2
+const PROTECTED_ROUTES_V2 = [
+  '/api/v2/tasks',
+  '/api/v2/lists',
+  '/api/v2/labels',
+  '/api/v2/comments',
+];
+
+// Public routes that don't require authentication (v1)
+const PUBLIC_ROUTES = [
+  '/api/v1/auth/login',
+  '/api/v1/auth/register',
+  '/api/v1/auth/logout',
+];
+
+// API routes that get stricter rate limits (v1)
+const STRICT_RATE_LIMIT_ROUTES = [
+  '/api/v1/ai',
+  '/api/v1/auth/login',
+  '/api/v1/auth/register',
+];
+
+// Legacy routes (redirect or warn)
+const LEGACY_ROUTES = [
   '/api/tasks',
   '/api/lists',
   '/api/labels',
@@ -12,18 +48,6 @@ const PROTECTED_ROUTES = [
   '/api/sharing',
   '/api/export',
   '/api/analytics',
-];
-
-// Public routes that don't require authentication
-const PUBLIC_ROUTES = [
-  '/api/auth/login',
-  '/api/auth/register',
-  '/api/auth/logout',
-];
-
-// API routes that get stricter rate limits
-const STRICT_RATE_LIMIT_ROUTES = [
-  '/api/ai',
   '/api/auth/login',
   '/api/auth/register',
 ];
@@ -80,7 +104,8 @@ export function middleware(request: NextRequest) {
   }
 
   // For protected routes, check for auth token
-  if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
+  const isProtectedRoute = [...PROTECTED_ROUTES, ...PROTECTED_ROUTES_V2].some(route => pathname.startsWith(route));
+  if (isProtectedRoute) {
     const authHeader = request.headers.get('authorization');
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
@@ -94,10 +119,28 @@ export function middleware(request: NextRequest) {
 
   const response = NextResponse.next();
 
+  // Add security headers
+  addSecurityHeaders(response);
+
+  // Add CORS headers
+  const origin = request.headers.get('origin');
+  addCorsHeaders(response, origin);
+
   // Add rate limit headers
   response.headers.set('X-RateLimit-Limit', rateLimitResult.limit.toString());
   response.headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString());
   response.headers.set('X-RateLimit-Reset', Math.ceil(rateLimitResult.reset / 1000).toString());
+
+  // Add API version header
+  const version = extractApiVersion(request);
+  response.headers.set('API-Version', version);
+
+  // Add deprecation warning for legacy routes
+  if (LEGACY_ROUTES.some(route => pathname.startsWith(route))) {
+    response.headers.set('API-Deprecation', 'true');
+    response.headers.set('API-Deprecation-Date', '2025-12-31');
+    response.headers.set('API-Migration-Guide', '/docs/migration/v1-to-v2');
+  }
 
   return response;
 }
