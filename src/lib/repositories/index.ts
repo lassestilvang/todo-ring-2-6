@@ -3,9 +3,15 @@
  * Export all repository classes and factory functions from a single entry point
  */
 
+// Base repository
+export { BaseRepository, QueryBuilder, Transaction } from './base-repository';
+
 // Existing repositories
 export { TaskRepository, getTaskRepository } from './task-repository';
 export { ListRepository, getListRepository } from './list-repository';
+
+// Enhanced Task Repository (refactored)
+export { TaskRepository as EnhancedTaskRepository, getTaskRepository as getEnhancedTaskRepository } from './task-repository-enhanced';
 
 // New repositories
 export { LabelRepository, getLabelRepository } from './label-repository';
@@ -35,3 +41,7 @@ export { ListShareRepository, getListShareRepository } from './list-share-reposi
 export { CommentMentionRepository, getCommentMentionRepository } from './comment-mention-repository';
 export { HabitStreakRepository, getHabitStreakRepository } from './habit-streak-repository';
 export { RecurringExceptionRepository, getRecurringExceptionRepository } from './recurring-exception-repository';
+
+// New repositories
+export { SavedViewRepository, getSavedViewRepository } from './saved-view-repository';
+export { GoalProgressRepository, getGoalProgressRepository } from './goal-progress-repository';
