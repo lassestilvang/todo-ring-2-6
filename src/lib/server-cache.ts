@@ -194,6 +194,53 @@ export async function invalidatePattern(pattern: string): Promise<void> {
 }
 
 /**
+ * Register a cache key for pattern-based invalidation
+ */
+export function registerCacheKey(key: string): void {
+  globalCacheRegistry.add(key);
+}
+
+/**
+ * Invalidate all cache for a specific user
+ */
+export async function invalidateUserCache(userId: string): Promise<void> {
+  await Promise.all([
+    invalidatePattern(`tasks:user:${userId}`),
+    invalidatePattern(`dashboard:${userId}`),
+    invalidatePattern(`user:${userId}`),
+  ]);
+}
+
+/**
+ * Invalidate cache for a specific task
+ */
+export async function invalidateTaskCache(taskId: string): Promise<void> {
+  await Promise.all([
+    serverCache.del(`task:detail:${taskId}`),
+    invalidatePattern(`tasks:user:`),
+  ]);
+}
+
+/**
+ * Invalidate cache for a list
+ */
+export async function invalidateListCache(listId: string): Promise<void> {
+  await invalidatePattern(`list:${listId}`);
+}
+
+/**
+ * Cache tags for dependency-based invalidation
+ */
+export const CacheTags = {
+  USER_TASKS: (userId: string) => `user:${userId}:tasks`,
+  USER_LISTS: (userId: string) => `user:${userId}:lists`,
+  TASK_DETAIL: (taskId: string) => `task:${taskId}`,
+  LIST_TASKS: (listId: string) => `list:${listId}:tasks`,
+  TEAM_WORKLOAD: (teamId: string) => `team:${teamId}:workload`,
+  DASHBOARD_STATS: (userId: string) => `dashboard:stats:${userId}`,
+};
+
+/**
  * Dashboard-specific cache utilities
  */
 export const DashboardCache = {
