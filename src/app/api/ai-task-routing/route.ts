@@ -79,7 +79,8 @@ async function enhanceWithClaude(taskText: string, baseAnalysis: any): Promise<a
   });
 
   // Parse Claude's response
-  const content = msg.content[0].if(typeof content === 'string') {
+  const content = msg.content[0].text;
+  if(typeof content === 'string') {
     try {
       return JSON.parse(content);
     } catch (parseError) {
