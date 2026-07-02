@@ -333,53 +333,6 @@ export const AIAssistantSchema = z.object({
   }).optional(),
 });
 
-// AI Schedule Schema
-export const AIScheduleSchema = z.object({
-  taskIds: z.array(z.string().uuid()).min(1, 'At least one task ID is required'),
-  range: z.enum(['7d', '30d', '90d']).default('30d'),
-});
-
-// Calendar Connection Schema
-export const CalendarConnectionSchema = z.object({
-  provider: z.enum(['google', 'outlook', 'ical']),
-  accessToken: z.string().min(1, 'Access token is required'),
-  refreshToken: z.string().optional(),
-  expiresAt: z.string().datetime().optional(),
-  userId: z.string().uuid(),
-});
-
-// Focus Session Schema
-export const FocusSessionSchema = z.object({
-  taskId: z.string().uuid().optional(),
-  duration: z.number().min(1, 'Duration must be at least 1 minute').max(1440, 'Duration cannot exceed 24 hours'),
-  userId: z.string().uuid(),
-});
-
-// Email Template Schema
-export const EmailTemplateSchema = z.object({
-  id: z.string().uuid().optional(),
-  name: z.string().min(1, 'Name is required').max(100),
-  type: z.enum(['reminder', 'welcome', 'password-reset', 'notification']),
-  subject: z.string().min(1, 'Subject is required').max(200),
-  html: z.string().min(1, 'HTML content is required'),
-  text: z.string().min(1, 'Text content is required'),
-  config: z.object({
-    brandColor: z.string().optional(),
-    brandName: z.string().optional(),
-    footerText: z.string().optional(),
-    showLogo: z.boolean().optional(),
-  }),
-});
-
-// Email Template Config type
-export const EmailTemplateConfigSchema = z.object({
-  brandColor: z.string().optional(),
-  brandName: z.string().optional(),
-  footerText: z.string().optional(),
-  showLogo: z.boolean().optional(),
-});
-export type EmailTemplateConfig = z.infer<typeof EmailTemplateConfigSchema>;
-
 // Helper function to validate and parse
 export function validateSchema<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data);
