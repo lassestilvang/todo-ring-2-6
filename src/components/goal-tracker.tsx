@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Goal } from '@/types/index';
+import { GoalTaskConverter } from './goal-task-converter';
 
 // Fetch goals
 async function fetchGoals(period?: string): Promise<Goal[]> {
@@ -165,7 +166,7 @@ function GoalForm({ onSubmit }: { onSubmit: (data: any) => void }) {
 }
 
 // Goal card component
-function GoalCard({ goal }: { goal: Goal }) {
+function GoalCard({ goal, onCreateTasks }: { goal: Goal; onCreateTasks: (tasks: any[]) => void }) {
   const percentage = Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100));
   const isCompleted = goal.isCompleted;
 
@@ -174,6 +175,7 @@ function GoalCard({ goal }: { goal: Goal }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
+      className="space-y-3"
     >
       <Card className={cn("relative overflow-hidden", isCompleted && "opacity-60")}>
         <CardHeader className="pb-3">
@@ -204,6 +206,19 @@ function GoalCard({ goal }: { goal: Goal }) {
           style={{ backgroundColor: goal.color }}
         />
       </Card>
+
+      {/* Goal Task Converter */}
+      {!isCompleted && (
+        <GoalTaskConverter
+          goal={goal}
+          onCreateTasks={(tasks) => onCreateTasks(tasks.map(t => ({
+            ...t,
+            listId: undefined,
+            date: undefined,
+            deadline: undefined,
+          })))}
+        />
+      )}
     </motion.div>
   );
 }
@@ -242,6 +257,17 @@ export function GoalTracker() {
 
   const handleDelete = (id: string) => {
     deleteMutation.mutate(id);
+  };
+
+  const handleCreateTasks = (tasks: any[]) => {
+    // Create tasks from goal breakdown
+    tasks.forEach(task => {
+      fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(task),
+      });
+    });
   };
 
   const periodLabels = {
@@ -299,7 +325,7 @@ export function GoalTracker() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence>
             {goals.map((goal) => (
-              <GoalCard key={goal.id} goal={goal} />
+              <GoalCard key={goal.id} goal={goal} onCreateTasks={handleCreateTasks} />
             ))}
           </AnimatePresence>
         </div>
