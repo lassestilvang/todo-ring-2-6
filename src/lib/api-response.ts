@@ -116,3 +116,37 @@ export function jsonRateLimit(retryAfter?: number): NextResponse<ApiResponse> {
     headers: retryAfter ? { 'Retry-After': retryAfter.toString() } : undefined
   });
 }
+
+/**
+ * Created response (201)
+ */
+export function jsonCreated<T>(data: T): NextResponse<ApiResponse<T>> {
+  return NextResponse.json<ApiResponse<T>>({
+    success: true,
+    data,
+  }, { status: 201 });
+}
+
+/**
+ * No content response (204)
+ */
+export function jsonNoContent(): NextResponse {
+  return new NextResponse(null, { status: 204 });
+}
+
+/**
+ * Accepted response (202) for async operations
+ */
+export function jsonAccepted<T>(data: T, message?: string): NextResponse<ApiResponse<T>> {
+  return NextResponse.json<ApiResponse<T>>({
+    success: true,
+    data,
+    message,
+  }, { status: 202 });
+}
+
+/**
+ * Re-export ErrorCodes from error-codes.ts for backward compatibility
+ * All error codes are defined in error-codes.ts
+ */
+export { ErrorCodes, type ErrorCode } from './error-codes';
