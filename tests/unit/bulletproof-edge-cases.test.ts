@@ -15,7 +15,8 @@ describe('Bulletproof Edge Cases', () => {
     it('should handle whitespace-only title', async () => {
       const { TaskSchema } = await import('../../src/lib/validations');
       const result = TaskSchema.safeParse({ title: '   ' });
-      expect(result.success).toBe(true); // Schema allows whitespace
+      // Schema min(1) means at least 1 character required - whitespace is a character
+      expect(result.success).toBe(true);
     });
   });
 
