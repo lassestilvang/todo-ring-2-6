@@ -75,7 +75,7 @@ describe('API Custom Fields Route', () => {
 
     it('should create custom field with valid data', () => {
       const body = {
-        taskId: 'task-1',
+        taskId: '550e8400-e29b-41d4-a716-446655440000',
         fieldKey: 'priority',
         fieldType: 'select' as const,
         fieldValue: 'high',
@@ -100,7 +100,7 @@ describe('API Custom Fields Route', () => {
     });
 
     it('should apply default fieldType', () => {
-      const body = { taskId: 'task-1', fieldKey: 'test', label: 'Test' };
+      const body = { taskId: '550e8400-e29b-41d4-a716-446655440000', fieldKey: 'test', label: 'Test' };
       const result = CustomFieldSchema.safeParse(body);
 
       expect(result.success).toBe(true);
@@ -110,7 +110,7 @@ describe('API Custom Fields Route', () => {
 
   describe('PUT /api/custom-fields', () => {
     it('should update field value', () => {
-      store.customFields.push({ id: '1', taskId: 'task-1', fieldKey: 'priority', fieldType: 'select', fieldValue: 'high', label: 'Priority' });
+      store.customFields.push({ id: '1', taskId: '550e8400-e29b-41d4-a716-446655440000', fieldKey: 'priority', fieldType: 'select', fieldValue: 'high', label: 'Priority' });
 
       store.customFields[0].fieldValue = 'medium';
       store.customFields[0] = store.customFields[0];
@@ -119,7 +119,7 @@ describe('API Custom Fields Route', () => {
     });
 
     it('should update label', () => {
-      store.customFields.push({ id: '1', taskId: 'task-1', fieldKey: 'test', fieldType: 'text', fieldValue: '', label: 'Old Label' });
+      store.customFields.push({ id: '1', taskId: '550e8400-e29b-41d4-a716-446655440000', fieldKey: 'test', fieldType: 'text', fieldValue: '', label: 'Old Label' });
 
       store.customFields[0].label = 'New Label';
       store.customFields[0] = store.customFields[0];
@@ -130,8 +130,8 @@ describe('API Custom Fields Route', () => {
 
   describe('DELETE /api/custom-fields', () => {
     it('should delete custom field', () => {
-      store.customFields.push({ id: '1', taskId: 'task-1', fieldKey: 'test', fieldType: 'text', fieldValue: '', label: 'Test' });
-      store.customFields.push({ id: '2', taskId: 'task-1', fieldKey: 'other', fieldType: 'text', fieldValue: '', label: 'Other' });
+      store.customFields.push({ id: '1', taskId: '550e8400-e29b-41d4-a716-446655440000', fieldKey: 'test', fieldType: 'text', fieldValue: '', label: 'Test' });
+      store.customFields.push({ id: '2', taskId: '550e8400-e29b-41d4-a716-446655440000', fieldKey: 'other', fieldType: 'text', fieldValue: '', label: 'Other' });
 
       const initialLength = store.customFields.length;
       store.customFields = store.customFields.filter(f => f.id !== '1');
@@ -143,7 +143,7 @@ describe('API Custom Fields Route', () => {
     it('should validate all field types', () => {
       const fieldTypes = ['text', 'number', 'date', 'select', 'checkbox', 'textarea'];
       fieldTypes.forEach(type => {
-        const body = { taskId: 'task-1', fieldKey: 'test', fieldType: type, label: 'Test' };
+        const body = { taskId: '550e8400-e29b-41d4-a716-446655440000', fieldKey: 'test', fieldType: type, label: 'Test' };
         const result = CustomFieldSchema.safeParse(body);
         expect(result.success).toBe(true);
       });
@@ -158,27 +158,27 @@ describe('API Custom Fields Route', () => {
 
   describe('Field Value Handling', () => {
     it('should handle empty field value', () => {
-      const body = { taskId: 'task-1', fieldKey: 'test', label: 'Test' };
+      const body = { taskId: '550e8400-e29b-41d4-a716-446655440000', fieldKey: 'test', label: 'Test' };
       const result = CustomFieldSchema.safeParse(body);
       expect(result.success).toBe(true);
       expect(result.data?.fieldValue).toBe('');
     });
 
     it('should handle text field value', () => {
-      const body = { taskId: 'task-1', fieldKey: 'description', fieldType: 'text', fieldValue: 'Some description', label: 'Description' };
+      const body = { taskId: '550e8400-e29b-41d4-a716-446655440000', fieldKey: 'description', fieldType: 'text', fieldValue: 'Some description', label: 'Description' };
       const result = CustomFieldSchema.safeParse(body);
       expect(result.success).toBe(true);
       expect(result.data?.fieldValue).toBe('Some description');
     });
 
     it('should handle number field value', () => {
-      const body = { taskId: 'task-1', fieldKey: 'quantity', fieldType: 'number', fieldValue: '42', label: 'Quantity' };
+      const body = { taskId: '550e8400-e29b-41d4-a716-446655440000', fieldKey: 'quantity', fieldType: 'number', fieldValue: '42', label: 'Quantity' };
       const result = CustomFieldSchema.safeParse(body);
       expect(result.success).toBe(true);
     });
 
     it('should handle checkbox field value', () => {
-      const body = { taskId: 'task-1', fieldKey: 'completed', fieldType: 'checkbox', fieldValue: 'true', label: 'Completed' };
+      const body = { taskId: '550e8400-e29b-41d4-a716-446655440000', fieldKey: 'completed', fieldType: 'checkbox', fieldValue: 'true', label: 'Completed' };
       const result = CustomFieldSchema.safeParse(body);
       expect(result.success).toBe(true);
     });
