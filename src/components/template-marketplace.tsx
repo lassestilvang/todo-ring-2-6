@@ -1,13 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Star, Download, TrendingUp, Filter } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Star, Download, TrendingUp, Filter, Eye, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Template {
   id: string;
@@ -33,9 +36,18 @@ interface TemplateMarketplaceProps {
   className?: string;
 }
 
+interface TemplateMarketplaceProps {
+  onCreateTask?: (template: Partial<{ title: string; description: string; priority: 'high' | 'medium' | 'low' | 'none'; estimateHours: number; estimateMinutes: number; isAllDay: boolean; recurringType: string }>) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  className?: string;
+}
+
 export function TemplateMarketplace({ onCreateTask, open, onOpenChange, className }: TemplateMarketplaceProps) {
   const [selectedCategory, setSelectedCategory] = React.useState<string>('all');
   const [sortBy, setSortBy] = React.useState<string>('usage_count');
+  const [previewTemplate, setPreviewTemplate] = React.useState<Template | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['templates', 'marketplace', selectedCategory, sortBy],
@@ -44,12 +56,37 @@ export function TemplateMarketplace({ onCreateTask, open, onOpenChange, classNam
       if (selectedCategory !== 'all') params.set('category', selectedCategory);
       params.set('sortBy', sortBy);
       params.set('limit', '50');
-      
+
       const res = await fetch(`/api/templates/marketplace?${params.toString()}`);
       const json = await res.json();
       return json.success ? json.data : [];
     },
   });
+
+  // Rating mutation
+  const rateMutation = useMutation({
+    mutationFn: async ({ templateId, rating }: { templateId: string; rating: number }) => {
+      const res = await fetch('/api/templates/rate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateId, rating }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to rate template');
+      return json.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates', 'marketplace'] });
+      toast.success('Rating submitted!');
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
+  });
+
+  const handleRate = (templateId: string, rating: number) => {
+    rateMutation.mutate({ templateId, rating });
+  };
 
   const categories = [...new Set(templates.map((t: Template) => t.category))];
 
@@ -146,10 +183,9 @@ export function TemplateMarketplace({ onCreateTask, open, onOpenChange, classNam
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {templates.map((template: Template) => (
-              <Card 
-                key={template.id} 
+              <Card
+                key={template.id}
                 className="group hover:shadow-lg transition-shadow cursor-pointer border-brand-500/20 bg-brand-500/5"
-                onClick={() => handleUseTemplate(template)}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -167,11 +203,11 @@ export function TemplateMarketplace({ onCreateTask, open, onOpenChange, classNam
                   <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                     {template.description}
                   </p>
-                  
-                  <div className="flex items-center justify-between text-xs">
+
+                  <div className="flex items-center justify-between text-xs mb-3">
                     <div className="flex items-center gap-2">
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className={cn("text-[10px]", getPriorityColor(template.priority))}
                       >
                         {template.priority}
@@ -185,12 +221,92 @@ export function TemplateMarketplace({ onCreateTask, open, onOpenChange, classNam
                       <span>{template.usageCount}</span>
                     </div>
                   </div>
+
+                  <div className="flex items-center gap-2 pt-2 border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1 h-7 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewTemplate(template);
+                      }}
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      Preview
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1 h-7 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUseTemplate(template);
+                      }}
+                    >
+                        Use Template
+                      </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
       </CardContent>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewTemplate} onOpenChange={(open) => !open && setPreviewTemplate(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>{previewTemplate?.icon}</span>
+              {previewTemplate?.name}
+            </DialogTitle>
+            <DialogDescription>{previewTemplate?.description}</DialogDescription>
+          </DialogHeader>
+
+          {previewTemplate && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Title: {previewTemplate.title}</p>
+                <div className="flex items-center gap-4 text-sm">
+                  <span>Priority: {previewTemplate.priority}</span>
+                  <span>Duration: {previewTemplate.estimateHours}h {previewTemplate.estimateMinutes}m</span>
+                </div>
+                {previewTemplate.recurringType !== 'none' && (
+                  <p className="text-sm text-muted-foreground">
+                    Recurring: {previewTemplate.recurringType}
+                  </p>
+                )}
+              </div>
+
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium mb-2">Rate this template</p>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => handleRate(previewTemplate.id, star)}
+                      className="hover:scale-110 transition-transform"
+                    >
+                      <Star className="w-5 h-5 text-amber-500 hover:fill-amber-500" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button onClick={() => handleUseTemplate(previewTemplate)} className="flex-1">
+                  Use This Template
+                </Button>
+                <Button variant="outline" onClick={() => setPreviewTemplate(null)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
