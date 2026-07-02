@@ -73,34 +73,34 @@ describe('Middleware - Comprehensive', () => {
   });
 
   describe('Public Routes', () => {
-    it('should allow access to /api/auth/login', async () => {
-      const request = createMockRequest('/api/auth/login');
+    it('should allow access to /api/v1/auth/login', async () => {
+      const request = createMockRequest('/api/v1/auth/login');
       await middleware(request);
       expect(mockNext).toHaveBeenCalled();
     });
 
-    it('should allow access to /api/auth/register', async () => {
-      const request = createMockRequest('/api/auth/register');
+    it('should allow access to /api/v1/auth/register', async () => {
+      const request = createMockRequest('/api/v1/auth/register');
       await middleware(request);
       expect(mockNext).toHaveBeenCalled();
     });
 
-    it('should allow access to /api/auth/logout', async () => {
-      const request = createMockRequest('/api/auth/logout');
+    it('should allow access to /api/v1/auth/logout', async () => {
+      const request = createMockRequest('/api/v1/auth/logout');
       await middleware(request);
       expect(mockNext).toHaveBeenCalled();
     });
 
     it('should allow access to nested auth routes', async () => {
-      const request = createMockRequest('/api/auth/login/special');
+      const request = createMockRequest('/api/v1/auth/login/special');
       await middleware(request);
       expect(mockNext).toHaveBeenCalled();
     });
   });
 
   describe('Protected Routes - Authentication Required', () => {
-    it('should block /api/tasks without auth token', async () => {
-      const request = createMockRequest('/api/tasks');
+    it('should block /api/v1/tasks without auth token', async () => {
+      const request = createMockRequest('/api/v1/tasks');
       const response = await middleware(request) as Response;
 
       expect(mockJson).toHaveBeenCalled();
@@ -112,65 +112,65 @@ describe('Middleware - Comprehensive', () => {
       });
     });
 
-    it('should block /api/lists without auth token', async () => {
-      const request = createMockRequest('/api/lists');
+    it('should block /api/v1/lists without auth token', async () => {
+      const request = createMockRequest('/api/v1/lists');
       const response = await middleware(request) as Response;
 
       expect(mockJson).toHaveBeenCalled();
     });
 
-    it('should block /api/labels without auth token', async () => {
-      const request = createMockRequest('/api/labels');
+    it('should block /api/v1/labels without auth token', async () => {
+      const request = createMockRequest('/api/v1/labels');
       const response = await middleware(request) as Response;
 
       expect(mockJson).toHaveBeenCalled();
     });
 
-    it('should block /api/subtasks without auth token', async () => {
-      const request = createMockRequest('/api/subtasks');
+    it('should block /api/v1/subtasks without auth token', async () => {
+      const request = createMockRequest('/api/v1/subtasks');
       const response = await middleware(request) as Response;
 
       expect(mockJson).toHaveBeenCalled();
     });
 
-    it('should block /api/comments without auth token', async () => {
-      const request = createMockRequest('/api/comments');
+    it('should block /api/v1/comments without auth token', async () => {
+      const request = createMockRequest('/api/v1/comments');
       const response = await middleware(request) as Response;
 
       expect(mockJson).toHaveBeenCalled();
     });
 
-    it('should block /api/sharing without auth token', async () => {
-      const request = createMockRequest('/api/sharing');
+    it('should block /api/v1/sharing without auth token', async () => {
+      const request = createMockRequest('/api/v1/sharing');
       const response = await middleware(request) as Response;
 
       expect(mockJson).toHaveBeenCalled();
     });
 
-    it('should block /api/export without auth token', async () => {
-      const request = createMockRequest('/api/export');
+    it('should block /api/v1/export without auth token', async () => {
+      const request = createMockRequest('/api/v1/export');
       const response = await middleware(request) as Response;
 
       expect(mockJson).toHaveBeenCalled();
     });
 
-    it('should block /api/analytics without auth token', async () => {
-      const request = createMockRequest('/api/analytics');
+    it('should block /api/v1/analytics without auth token', async () => {
+      const request = createMockRequest('/api/v1/analytics');
       const response = await middleware(request) as Response;
 
       expect(mockJson).toHaveBeenCalled();
     });
 
-    it('should allow /api/tasks with valid Bearer token', async () => {
-      const request = createMockRequest('/api/tasks', {
+    it('should allow /api/v1/tasks with valid Bearer token', async () => {
+      const request = createMockRequest('/api/v1/tasks', {
         authorization: 'Bearer valid-token',
       });
       await middleware(request);
       expect(mockNext).toHaveBeenCalled();
     });
 
-    it('should allow /api/lists with valid Bearer token', async () => {
-      const request = createMockRequest('/api/lists', {
+    it('should allow /api/v1/lists with valid Bearer token', async () => {
+      const request = createMockRequest('/api/v1/lists', {
         authorization: 'Bearer valid-token',
       });
       await middleware(request);
@@ -178,7 +178,7 @@ describe('Middleware - Comprehensive', () => {
     });
 
     it('should allow nested paths under protected routes', async () => {
-      const request = createMockRequest('/api/tasks/123/subtasks', {
+      const request = createMockRequest('/api/v1/tasks/123/subtasks', {
         authorization: 'Bearer valid-token',
       });
       await middleware(request);
@@ -209,7 +209,7 @@ describe('Middleware - Comprehensive', () => {
     });
 
     it('should handle authorization header without Bearer prefix', async () => {
-      const request = createMockRequest('/api/tasks', {
+      const request = createMockRequest('/api/v1/tasks', {
         authorization: 'invalid-format',
       });
       // Should still be treated as no token (null)
@@ -218,7 +218,7 @@ describe('Middleware - Comprehensive', () => {
     });
 
     it('should handle authorization header with only Bearer', async () => {
-      const request = createMockRequest('/api/tasks', {
+      const request = createMockRequest('/api/v1/tasks', {
         authorization: 'Bearer ',
       });
       // Empty token after Bearer is falsy, so it should be rejected
