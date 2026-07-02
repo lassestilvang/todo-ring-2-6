@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Repository Pattern**
+  - `SavedViewRepository` - CRUD operations for saved views
+  - `GoalProgressRepository` - Goal progress tracking operations
+  
+- **API Versioning**
+  - Versioned API routes under `/api/v1/` prefix
+  - `Accept-Version` header support for version selection
+  - Version headers in responses (`API-Version`, `X-API-Deprecation`)
+  - `v1` and `v2` version support
+  - Migration guide headers for deprecated versions
+
+- **Background Jobs**
+  - BullMQ queue system for background processing
+  - Queues: email, notifications, reminders, import, export, sync, cleanup
+  - Graceful shutdown handling
+  - Redis-backed job storage
+
+- **Database Performance**
+  - Performance indexes for all major tables
+  - Composite indexes for common queries
+  - Task, list, time entry, comment, goal indexes
+
+- **Caching**
+  - Redis caching with in-memory fallback
+  - Cache warming for popular views
+  - Pattern-based cache invalidation
+
+- **Documentation**
+  - Updated OpenAPI specification with v1 endpoints
+  - API versioning documentation in CLAUDE.md
+
 - **AI-Powered Features**
   - Smart task prioritization API (`/api/ai/prioritize`)
   - Conflict detection API (`/api/ai/conflicts`)
