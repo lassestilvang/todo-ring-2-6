@@ -13,6 +13,13 @@
  * }
  * ```
  */
+
+// Error severity levels
+export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+// Error categories for monitoring
+export type ErrorCategory = 'authentication' | 'validation' | 'resource' | 'conflict' | 'rate_limit' | 'server' | 'business' | 'feature';
+
 export const ErrorCodes = {
   // Authentication errors (AUTH_*)
   UNAUTHORIZED: 'AUTH_UNAUTHORIZED',
@@ -26,6 +33,7 @@ export const ErrorCodes = {
   VALIDATION_ERROR: 'VAL_ERROR',
   INVALID_INPUT: 'VAL_INVALID_INPUT',
   MISSING_REQUIRED_FIELD: 'VAL_MISSING_FIELD',
+  BAD_REQUEST: 'VAL_BAD_REQUEST',
 
   // Resource errors (RES_*)
   NOT_FOUND: 'RES_NOT_FOUND',
@@ -41,6 +49,7 @@ export const ErrorCodes = {
   DUPLICATE: 'CONFLICT_DUPLICATE',
   CIRCULAR_DEPENDENCY: 'CONFLICT_CIRCULAR_DEPENDENCY',
   SCHEDULE_CONFLICT: 'CONFLICT_SCHEDULE',
+  ALREADY_EXISTS: 'CONFLICT_ALREADY_EXISTS',
 
   // Rate limiting (RATE_*)
   RATE_LIMITED: 'RATE_LIMITED',
@@ -48,6 +57,7 @@ export const ErrorCodes = {
   // Server errors (SERVER_*)
   INTERNAL_ERROR: 'SERVER_INTERNAL_ERROR',
   DATABASE_ERROR: 'SERVER_DATABASE_ERROR',
+  NETWORK_ERROR: 'SERVER_NETWORK_ERROR',
   IMPORT_ERROR: 'SERVER_IMPORT_ERROR',
   EXPORT_ERROR: 'SERVER_EXPORT_ERROR',
 
@@ -96,6 +106,7 @@ export function getErrorMessage(code: ErrorCode): string {
     VAL_ERROR: 'Validation failed',
     VAL_INVALID_INPUT: 'Invalid input provided',
     VAL_MISSING_FIELD: 'Required field is missing',
+    VAL_BAD_REQUEST: 'Invalid request',
 
     // Resource messages
     RES_NOT_FOUND: 'Resource not found',
@@ -110,6 +121,7 @@ export function getErrorMessage(code: ErrorCode): string {
     CONFLICT_DUPLICATE: 'Resource already exists',
     CONFLICT_CIRCULAR_DEPENDENCY: 'Circular dependency detected',
     CONFLICT_SCHEDULE: 'Schedule conflict detected',
+    CONFLICT_ALREADY_EXISTS: 'Resource already exists',
 
     // Rate limiting
     RATE_LIMITED: 'Too many requests. Please try again later.',
@@ -119,6 +131,7 @@ export function getErrorMessage(code: ErrorCode): string {
     SERVER_DATABASE_ERROR: 'Database operation failed',
     SERVER_IMPORT_ERROR: 'Failed to import data',
     SERVER_EXPORT_ERROR: 'Failed to export data',
+    SERVER_NETWORK_ERROR: 'Network error occurred',
 
     // Business logic
     BUSINESS_CANNOT_COMPLETE: 'Cannot complete this task',
@@ -139,4 +152,63 @@ export function getErrorMessage(code: ErrorCode): string {
   };
 
   return messages[code] || 'An unknown error occurred';
+}
+
+/**
+ * Error metadata for monitoring and logging
+ */
+export interface ErrorMetadata {
+  severity: ErrorSeverity;
+  category: ErrorCategory;
+  logLevel: 'debug' | 'info' | 'warn' | 'error';
+  retryable: boolean;
+}
+
+/**
+ * Get error metadata for monitoring
+ */
+export function getErrorMetadata(code: ErrorCode): ErrorMetadata {
+  const authErrors = ['AUTH_UNAUTHORIZED', 'AUTH_FORBIDDEN', 'AUTH_INVALID_TOKEN', 'AUTH_TOKEN_EXPIRED', 'AUTH_MFA_REQUIRED', 'AUTH_MFA_INVALID'];
+  const validationErrors = ['VAL_ERROR', 'VAL_INVALID_INPUT', 'VAL_MISSING_FIELD', 'VAL_BAD_REQUEST'];
+  const rateLimitErrors = ['RATE_LIMITED'];
+  const serverErrors = ['SERVER_INTERNAL_ERROR', 'SERVER_DATABASE_ERROR', 'SERVER_NETWORK_ERROR', 'SERVER_IMPORT_ERROR', 'SERVER_EXPORT_ERROR'];
+
+  if (authErrors.includes(code)) {
+    return { severity: 'medium', category: 'authentication', logLevel: 'warn', retryable: false };
+  }
+  if (validationErrors.includes(code)) {
+    return { severity: 'low', category: 'validation', logLevel: 'info', retryable: false };
+  }
+  if (rateLimitErrors.includes(code)) {
+    return { severity: 'low', category: 'rate_limit', logLevel: 'info', retryable: true };
+  }
+  if (serverErrors.includes(code)) {
+    return { severity: 'high', category: 'server', logLevel: 'error', retryable: true };
+  }
+
+  return { severity: 'medium', category: 'business', logLevel: 'warn', retryable: false };
+}
+
+/**
+ * Create a structured API error
+ */
+export class ApiError extends Error {
+  constructor(
+    public readonly code: ErrorCode,
+    message: string,
+    public readonly statusCode: number = 500,
+    public readonly metadata?: Record<string, any>
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+
+  toJSON() {
+    return {
+      success: false,
+      error: this.message,
+      code: this.code,
+      ...(this.metadata && { details: this.metadata }),
+    };
+  }
 }
