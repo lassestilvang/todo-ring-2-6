@@ -67,7 +67,7 @@ describe('API Calendar Route', () => {
       store.events.push({ id: '1', summary: 'Task Event', description: '', start: '2024-01-15T10:00:00Z', end: '2024-01-15T11:00:00Z', location: '', taskId: '550e8400-e29b-41d4-a716-446655440000' });
       store.events.push({ id: '2', summary: 'Other Event', description: '', start: '2024-01-15T10:00:00Z', end: '2024-01-15T11:00:00Z', location: '', taskId: '550e8400-e29b-41d4-a716-446655440001' });
 
-      const taskEvents = store.events.filter(e => e.taskId === 'task-1');
+      const taskEvents = store.events.filter(e => e.taskId === '550e8400-e29b-41d4-a716-446655440000');
       expect(taskEvents).toHaveLength(1);
     });
   });
