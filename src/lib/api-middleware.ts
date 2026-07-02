@@ -5,11 +5,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit } from './rate-limiter';
 import { sanitizeObject } from './sanitize';
+import { jsonError, jsonValidationError, ErrorCodes, ErrorCode, ApiResponse } from './api-response';
+import { verifyJwt } from './jwt';
+import { extractApiVersion } from './api-versioning';
 
 export interface MiddlewareResult {
   shouldProceed: boolean;
   response?: NextResponse;
 }
+
+export interface ApiContext {
+  user?: { id: string; email: string; name?: string };
+  params?: Record<string, string>;
+  version?: string;
+}
+
+export type ApiHandler<T = any> = (
+  request: NextRequest,
+  context: ApiContext
+) => Promise<T | NextResponse> | T | Promise<NextResponse>;
 
 /**
  * Apply rate limiting to API requests
@@ -110,4 +124,116 @@ export function withMiddleware<T = any>(
 
     return handler(req, sanitizedBody as T);
   };
+}
+
+// ============================================================================
+// Enhanced middleware with authentication and context
+// ============================================================================
+
+/**
+ * Create API middleware with configuration
+ */
+export function createApiMiddleware(config: { requireAuth?: boolean; validateVersion?: boolean } = {}) {
+  return async (
+    request: NextRequest,
+    handler: ApiHandler
+  ): Promise<NextResponse> => {
+    const context: ApiContext = {};
+
+    try {
+      // Extract version
+      if (config.validateVersion) {
+        context.version = extractApiVersion(request);
+      }
+
+      // Authentication
+      if (config.requireAuth) {
+        const authHeader = request.headers.get('authorization');
+        const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+        if (!token) {
+          return jsonError('Authentication required', 401, ErrorCodes.UNAUTHORIZED);
+        }
+
+        try {
+          const decoded = await verifyJwt(token);
+          context.user = {
+            id: decoded.sub,
+            email: decoded.email,
+            name: decoded.name,
+          };
+        } catch (error) {
+          return jsonError('Invalid or expired token', 401, ErrorCodes.INVALID_TOKEN);
+        }
+      }
+
+      // Execute handler
+      const result = await handler(request, context);
+
+      // If result is already a NextResponse, return it
+      if (result instanceof NextResponse) {
+        return result;
+      }
+
+      // Wrap successful result
+      return NextResponse.json<ApiResponse>({ success: true, data: result });
+    } catch (error) {
+      // Handle validation errors
+      if (error instanceof ValidationError) {
+        return jsonValidationError(
+          error.errors.map(e => ({ path: e.path, message: e.message }))
+        );
+      }
+
+      // Handle known error codes
+      const knownError = error as KnownApiError;
+      if (knownError.code && Object.values(ErrorCodes).includes(knownError.code as ErrorCode)) {
+        return jsonError(
+          knownError.message || 'An error occurred',
+          knownError.status || 500,
+          knownError.code
+        );
+      }
+
+      // Handle unexpected errors
+      const message = error instanceof Error ? error.message : 'Internal server error';
+      console.error('API Error:', error);
+      return jsonError(message, 500, ErrorCodes.INTERNAL_ERROR);
+    }
+  };
+}
+
+/**
+ * Convenience middleware creators
+ */
+export const requireAuth = createApiMiddleware({ requireAuth: true });
+export const withVersion = createApiMiddleware({ validateVersion: true });
+export const requireAuthAndVersion = createApiMiddleware({ requireAuth: true, validateVersion: true });
+
+/**
+ * ValidationError for validation failures
+ */
+export class ValidationError extends Error {
+  constructor(public readonly errors: Array<{ path: (string | number)[]; message: string }>) {
+    super('Validation failed');
+    this.name = 'ValidationError';
+  }
+}
+
+/**
+ * KnownApiError for typed error handling
+ */
+export interface KnownApiError extends Error {
+  code?: ErrorCode;
+  status?: number;
+}
+
+/**
+ * Parse Zod errors into validation error format
+ */
+export function parseZodError(error: any): Array<{ path: (string | number)[]; message: string }> {
+  return error.errors?.map((e: any) => ({
+    path: e.path,
+    message: e.message,
+  })) || [{ path: [], message: 'Validation failed' }];
 }
