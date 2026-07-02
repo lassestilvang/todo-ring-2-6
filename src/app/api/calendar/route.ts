@@ -1,35 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureDbInitialized } from '@/lib/db-init';
-import { getTasks, createTask } from '@/db/operations';
-import { parseICS, stringifyICS } from 'ics';
-import fs from 'fs/promises';
-import path from 'path';
-
-// Keep track of calendar subscriptions
-let calendarSubscriptions = new Map();
+import { getTasks, createTask, updateTask, getTaskById } from '@/db/operations';
+import { parseICS, stringifyICS, getDateTime } from 'ics';
+import { randomUUID } from 'crypto';
+import { z } from 'zod';
+import { jsonSuccess, jsonError, jsonValidationError, ErrorCodes } from '@/lib/api-response';
 
 ensureDbInitialized();
 
-export async function GET(_req: NextRequest) {
+// Validation schemas
+const ICSImportSchema = z.object({
+  content: z.string().min(1, 'ICS content is required'),
+});
+
+const TaskUpdateSchema = z.object({
+  taskId: z.string().uuid('Invalid task ID'),
+  updates: z.record(z.any()),
+});
+
+const TaskCreationSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().optional(),
+  date: z.string().optional(),
+  deadline: z.string().optional(),
+  priority: z.enum(['high', 'medium', 'low', 'none']).optional(),
+  listId: z.string().optional(),
+});
+
+/**
+ * GET /api/calendar
+ * Get tasks for calendar view
+ */
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(_req.url);
+    const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    const tasks = getTasks();
+    let tasks = getTasks();
 
-    // Filter by date range if provided
-    let filteredTasks = tasks;
+    // Filter by date range
     if (startDate) {
-      filteredTasks = filteredTasks.filter(t => t.date && t.date >= startDate);
+      tasks = tasks.filter(t => t.date && t.date >= startDate);
     }
     if (endDate) {
-      filteredTasks = filteredTasks.filter(t => t.date && t.date <= endDate);
+      tasks = tasks.filter(t => t.date && t.date <= endDate);
     }
 
-    // Group by date for calendar view
+    // Group by date
     const grouped: Record<string, typeof tasks> = {};
-    for (const task of filteredTasks) {
+    for (const task of tasks) {
       if (task.date) {
         if (!grouped[task.date]) {
           grouped[task.date] = [];
@@ -38,259 +58,235 @@ export async function GET(_req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        tasks: filteredTasks,
-        grouped,
-        total: filteredTasks.length,
-      },
+    return jsonSuccess({
+      tasks,
+      grouped,
+      total: tasks.length,
     });
   } catch (error) {
     console.error('Calendar API error:', error);
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to fetch calendar data' },
-      { status: 500 }
+    return jsonError(
+      error instanceof Error ? error.message : 'Failed to fetch calendar data',
+      500,
+      ErrorCodes.INTERNAL_ERROR
     );
   }
 }
 
+/**
+ * POST /api/calendar
+ * Import tasks from ICS or create new task
+ */
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get('content-type');
 
     if (contentType?.includes('application/ics')) {
-      // Handle ICS import
       return await handleICSImport(request);
-    } else {
-      // Assume new task creation
-      return await handleTaskCreation(request);
     }
+
+    // Default: create new task
+    return await handleTaskCreation(request);
   } catch (error) {
     console.error('Calendar POST error:', error);
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to process request' },
-      { status: 500 }
+    return jsonError(
+      error instanceof Error ? error.message : 'Failed to process request',
+      500,
+      ErrorCodes.INTERNAL_ERROR
     );
   }
 }
 
-async function handleICSImport(request: NextRequest) {
-  try {
-    const body = await request.text();
-    const tasks = parseICS(body, (err, data) => {
-      if (err) {
-        return NextResponse.json(
-          { success: false, error: `ICS parsing error: ${err.message}` },
-          { status: 400 }
-        );
-      }
-
-      // Process each imported task
-      const createdTasks = [];
-      for (const task of data.tasks) {
-        // Check if task already exists
-        const existingTaskIndex = getTasks().findIndex(t =>
-          t.title === task.description &&
-          t.dueDate === task.due
-        );
-
-        if (existingTaskIndex === -1) {
-          // Create unique ID and save
-          const newTask = {
-            id: Date.now().toString(),
-            title: task.description || 'Untitled Task',
-            description: task.description || '',
-            status: 'pending',
-            listId: 'default',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            dueDate: task.due || new Date().toISOString(),
-            priority: 'medium',
-            tags: extractTagsFromDescription(task.description || ''),
-            context: task.description || ''
-          };
-
-          createTask(newTask);
-          createdTasks.push(newTask);
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-        importedTasks: createdTasks.length,
-        message: `Successfully imported ${createdTasks.length} tasks from ICS`
-      });
-    })(request.body as any);
-
-    if (!tasks) {
-      return NextResponse.json(
-        { success: false, error: 'No tasks parsed from ICS' },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      importedTasks: tasks.length,
-      message: `Successfully imported ${tasks.length} tasks from ICS`
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: `ICS import failed: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 400 }
-    );
-  }
-}
-
-function extractTagsFromDescription(text: string): string[] {
-  // Simple tag extraction pattern
-  const tagMatches = text.match(/#(\w+)/g);
-  return tagMatches ? tagMatches.map(m => m.slice(1)) : [];
-}
-
-async function handleTaskCreation(request: NextRequest) {
-  try {
-    const body = await request.json();
-
-    // Validate required fields
-    if (!body.task || !body.task.content) {
-      return NextResponse.json(
-        { success: false, error: 'Task content is required' },
-        { status: 400 }
-      };
-    }
-
-    const newTask = {
-      id: Date.now().toString(),
-      content: body.task.content,
-      description: body.task.description || '',
-      status: 'pending',
-      priority: body.task.priority || 'medium',
-      tags: body.task.tags || [],
-      context: body.task.context || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    createTask(newTask);
-
-    return NextResponse.json({
-      success: true,
-      task: newTask
-    }, { status: 201 });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to create task' },
-      { status: 500 }
-    );
-  }
-}
-
+/**
+ * PUT /api/calendar
+ * Export to ICS or update task
+ */
 export async function PUT(request: NextRequest) {
   try {
     const contentType = request.headers.get('content-type');
 
     if (contentType?.includes('application/ics')) {
-      // Handle ICS export
       return await handleICSExport(request);
-    } else {
-      // Handle task update
-      return await handleTaskUpdate(request);
     }
+
+    return await handleTaskUpdate(request);
   } catch (error) {
     console.error('Calendar PUT error:', error);
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to update resource' },
-      { status: 500 }
+    return jsonError(
+      error instanceof Error ? error.message : 'Failed to update resource',
+      500,
+      ErrorCodes.INTERNAL_ERROR
     );
   }
 }
 
+/**
+ * Import tasks from ICS file
+ */
+async function handleICSImport(request: NextRequest) {
+  try {
+    const body = await request.text();
+    const validated = ICSImportSchema.safeParse({ content: body });
+
+    if (!validated.success) {
+      return jsonValidationError(validated.error.errors);
+    }
+
+    // Parse ICS content
+    const parsed = parseICS(validated.data.content, {
+      // Config options for ics library
+    });
+
+    if (!parsed) {
+      return jsonError('Failed to parse ICS content', 400, ErrorCodes.VALIDATION_ERROR);
+    }
+
+    const createdTasks = [];
+    const existingTasks = getTasks();
+
+    for (const event of parsed.events) {
+      // Check for duplicates
+      const exists = existingTasks.some(
+        t => t.title === event.summary || t.id === event.uid
+      );
+
+      if (!exists) {
+        const newTask = createTask({
+          id: randomUUID(),
+          title: event.summary || 'Untitled Task',
+          description: event.description || '',
+          date: getDateTime(event.start) || undefined,
+          deadline: getDateTime(event.end) || undefined,
+          priority: 'medium',
+          listId: 'default',
+        });
+        createdTasks.push(newTask);
+      }
+    }
+
+    return jsonSuccess({
+      imported: createdTasks.length,
+      tasks: createdTasks,
+      message: `Successfully imported ${createdTasks.length} tasks from ICS`,
+    });
+  } catch (error) {
+    return jsonError(
+      `ICS import failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      400,
+      ErrorCodes.IMPORT_ERROR
+    );
+  }
+}
+
+/**
+ * Create a new task from request body
+ */
+async function handleTaskCreation(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const validated = TaskCreationSchema.safeParse(body);
+
+    if (!validated.success) {
+      return jsonValidationError(validated.error.errors);
+    }
+
+    const newTask = createTask({
+      id: randomUUID(),
+      ...validated.data,
+    });
+
+    return jsonSuccess(newTask, 201);
+  } catch (error) {
+    return jsonError(
+      error instanceof Error ? error.message : 'Failed to create task',
+      500,
+      ErrorCodes.INTERNAL_ERROR
+    );
+  }
+}
+
+/**
+ * Update an existing task
+ */
+async function handleTaskUpdate(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const validated = TaskUpdateSchema.safeParse(body);
+
+    if (!validated.success) {
+      return jsonValidationError(validated.error.errors);
+    }
+
+    const { taskId, updates } = validated.data;
+
+    // Check if task exists
+    const existingTask = getTaskById(taskId);
+    if (!existingTask) {
+      return jsonError('Task not found', 404, ErrorCodes.TASK_NOT_FOUND);
+    }
+
+    // Update task
+    const updatedTask = updateTask(taskId, updates);
+
+    return jsonSuccess({
+      task: updatedTask,
+      message: 'Task updated successfully',
+    });
+  } catch (error) {
+    return jsonError(
+      error instanceof Error ? error.message : 'Failed to update task',
+      500,
+      ErrorCodes.INTERNAL_ERROR
+    );
+  }
+}
+
+/**
+ * Export tasks to ICS format
+ */
 async function handleICSExport(request: NextRequest) {
   try {
     const body = await request.json();
-    const { tasks, format } = body;
+    const { tasks, format = 'ics' } = body;
 
-    const formatOptions = {
-      method: 'PUBLISH',
-      params: { METHOD: 'PUBLISH' },
-      encoding: { 7bit: true },
-      generateBusyStatus: true,
-    };
+    if (!tasks || !Array.isArray(tasks)) {
+      return jsonError('Tasks array is required', 400, ErrorCodes.BAD_REQUEST);
+    }
+
+    const events = tasks.map((task: any) => ({
+      summary: task.title,
+      description: task.description || '',
+      start: {
+        date: task.date,
+      },
+      end: {
+        date: task.deadline || task.date,
+      },
+      uid: task.id,
+    }));
 
     const icsContent = stringifyICS({
-      name: 'TaskPlanner Calendar Export',
-      description: 'Exported from TaskPlanner application',
-      events: tasks.map(task => ({
-        startDate: task.createdAt,
-        durationMinutes: 60, // default duration
-        location: '',
-        description: `${task.title}\nTags: ${task.tags.join(', ')}\n${task.context || ''}`,
-        uid: task.id,
-        fromDate: task.createdAt,
-        toDate: task.dueDate || task.createdAt,
-      })),
-      ...formatOptions
+      events,
     });
 
+    if (!icsContent) {
+      return jsonError('Failed to generate ICS', 500, ErrorCodes.EXPORT_ERROR);
+    }
+
     return NextResponse.json(
-      { ics: icsContent },
+      { success: true, ics: icsContent },
       {
         headers: {
           'Content-Type': 'text/calendar; charset=utf-8',
           'Content-Disposition': 'attachment; filename="tasks.ics"',
-          'Content-Length': Buffer.byteLength(icsContent)
-        }
+        },
       }
     );
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'ICS export failed' },
-      { status: 500 }
-    );
-  }
-}
-
-async function handleTaskUpdate(request: NextRequest) {
-  try {
-    const { taskId, updates } = await request.json();
-
-    if (!taskId || !updates) {
-      return NextResponse.json(
-        { success: false, error: 'Task ID and updates are required' },
-        { status: 400 }
-      );
-    }
-
-    const tasks = getTasks();
-    const taskIndex = tasks.findIndex(t => t.id === taskId);
-
-    if (taskIndex === -1) {
-      return NextResponse.json(
-        { success: false, error: 'Task not found' },
-        { status: 404 }
-      );
-    }
-
-    // Update task
-    const updatedTask = {
-      ...tasks[taskIndex],
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
-
-    // In a real implementation, this would persist to database
-    // For now, we just return success
-    return NextResponse.json({
-      success: true,
-      task: updatedTask,
-      message: 'Task updated successfully'
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to update task' },
-      { status: 500 }
+    return jsonError(
+      error instanceof Error ? error.message : 'ICS export failed',
+      500,
+      ErrorCodes.EXPORT_ERROR
     );
   }
 }
