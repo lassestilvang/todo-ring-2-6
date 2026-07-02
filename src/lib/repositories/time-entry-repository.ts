@@ -65,6 +65,15 @@ export class TimeEntryRepository {
     return this.findByTaskId(taskId);
   }
 
+  /**
+   * Find entries within a date range
+   */
+  findInRange(startDate: Date, endDate: Date): TimeEntry[] {
+    return this.db.prepare(
+      'SELECT * FROM time_entries WHERE start_time >= ? AND start_time <= ? ORDER BY start_time DESC'
+    ).all(startDate.toISOString(), endDate.toISOString()) as TimeEntry[];
+  }
+
   getReports(period: 'day' | 'week' | 'month' = 'week', taskId?: string): { totalMinutes: number; entries: TimeEntry[] } {
     const now = new Date();
     let startDate: Date;
