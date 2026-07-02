@@ -12,11 +12,72 @@ import { TaskDependencySchema } from '@/lib/validations';
 
 ensureDbInitialized();
 
+/**
+ * Check if adding a dependency would create a circular reference
+ * Uses depth-first search to detect cycles
+ */
+function wouldCreateCycle(taskId: string, dependsOnId: string): boolean {
+  // Build a map of all dependencies
+  const allDeps = getTaskDependencies(taskId);
+  const depMap = new Map<string, string[]>();
+
+  // Get all dependencies for all tasks we need to check
+  const allTasks = new Set([taskId]);
+  let toProcess = [taskId];
+
+  while (toProcess.length > 0) {
+    const current = toProcess.pop()!;
+    const deps = getTaskDependencies(current);
+    depMap.set(current, deps.map(d => d.dependsOnId));
+    deps.forEach(d => {
+      if (!allTasks.has(d.dependsOnId)) {
+        allTasks.add(d.dependsOnId);
+        toProcess.push(d.dependsOnId);
+      }
+    });
+  }
+
+  // DFS to check for cycle
+  const visited = new Set<string>();
+  const recStack = new Set<string>();
+
+  function dfs(node: string): boolean {
+    visited.add(node);
+    recStack.add(node);
+
+    const neighbors = depMap.get(node) || [];
+    for (const neighbor of neighbors) {
+      if (!visited.has(neighbor)) {
+        if (dfs(neighbor)) return true;
+      } else if (recStack.has(neighbor)) {
+        return true;
+      }
+    }
+
+    recStack.delete(node);
+    return false;
+  }
+
+  // Check if dependsOnId can reach taskId through existing dependencies
+  if (depMap.has(dependsOnId)) {
+    return dfs(dependsOnId);
+  }
+
+  return false;
+}
+
 export async function GET(_req: NextRequest) {
   try {
     const { searchParams } = new URL(_req.url);
     const taskId = searchParams.get('taskId');
+    const dependsOnId = searchParams.get('dependsOnId');
     const view = searchParams.get('view'); // 'blocked' or 'blocking'
+
+    // Check for circular dependency
+    if (taskId && dependsOnId) {
+      const hasCycle = wouldCreateCycle(taskId, dependsOnId);
+      return jsonSuccess({ hasCycle });
+    }
 
     if (taskId) {
       if (view === 'blocked') {
