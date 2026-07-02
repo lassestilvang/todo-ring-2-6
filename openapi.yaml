@@ -31,6 +31,9 @@ servers:
   - url: https://api.taskplanner.app
     description: Production server
 
+  - url: http://localhost:3000/api/v1
+    description: API v1 (stable)
+
 tags:
   - name: auth
     description: Authentication and user management
@@ -339,6 +342,317 @@ paths:
                   data:
                     $ref: '#/components/schemas/DashboardAnalytics'
 
+  /api/v1/tasks:
+    get:
+      tags: [tasks]
+      summary: Get tasks (v1)
+      description: Retrieve tasks with optional filtering and pagination
+      parameters:
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [today, next7, upcoming, all, inbox]
+        - name: listId
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /api/v1/lists:
+    get:
+      tags: [lists]
+      summary: Get all lists (v1)
+      responses:
+        '200':
+          description: List of lists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/List'
+
+  /api/v1/time-entries:
+    get:
+      tags: [time-tracking]
+      summary: Get time entries (v1)
+      parameters:
+        - name: taskId
+          in: query
+          schema:
+            type: string
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, week, month]
+      responses:
+        '200':
+          description: Time entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TimeEntry'
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Login (v1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+
+  /api/v1/tasks/{id}:
+    get:
+      tags: [tasks]
+      summary: Get task by ID (v1)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Task'
+        '404':
+          description: Task not found
+
+  /api/v1/comments:
+    get:
+      tags: [comments]
+      summary: Get comments (v1)
+      parameters:
+        - name: taskId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+
+  /api/v1/comments/{commentId}/reactions:
+    get:
+      tags: [comments]
+      summary: Get reactions for a comment (v1)
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of reactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CommentReaction'
+
+  /api/v1/saved-views:
+    get:
+      tags: [saved-views]
+      summary: Get saved views (v1)
+      responses:
+        '200':
+          description: List of saved views
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SavedView'
+
+  /api/v1/analytics/dashboard:
+    get:
+      tags: [analytics]
+      summary: Get dashboard analytics (v1)
+      parameters:
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: [week, month, quarter]
+          default: week
+      responses:
+        '200':
+          description: Dashboard analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/DashboardAnalytics'
+
+  /api/v1/webhooks:
+    post:
+      tags: [webhooks]
+      summary: Register webhook (v1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, events]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                events:
+                  type: array
+                  items:
+                    type: string
+                secret:
+                  type: string
+      responses:
+        '201':
+          description: Webhook registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Webhook'
+
+components:
+  schemas:
+    Pagination:
+      type: object
+      properties:
+        limit:
+          type: integer
+        cursor:
+          type: string
+        hasMore:
+          type: boolean
+    TimeEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        taskId:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        duration:
+          type: number
+        description:
+          type: string
+
 components:
   schemas:
     Task:
@@ -561,3 +875,117 @@ components:
           type: number
         streak:
           type: integer
+
+    Subtask:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        isCompleted:
+          type: boolean
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        userName:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    CommentReaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        commentId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        emoji:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    SavedView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        icon:
+          type: string
+        filters:
+          type: object
+        userId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        secret:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    TimeEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        duration:
+          type: number
+        description:
+          type: string
