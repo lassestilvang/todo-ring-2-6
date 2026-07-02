@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "benchmark": "tsx scripts/benchmark.ts",
+    "benchmark:api": "tsx scripts/benchmark-api.ts",
     "docs": "swagger-ui-express ./openapi.yaml",
     "docs:generate": "tsx scripts/generate-api-docs.ts",
     "storybook": "storybook dev",
@@ -73,6 +75,8 @@
     "unleash-client": "^4.3.0",
     "web-push": "^3.6.7",
     "winston": "^3.13.0",
+    "redis": "^4.6.0",
+    "bullmq": "^4.0.0",
     "winston-papertrail": "^2.3.0",
     "winston-transport": "^4.6.0",
     "ws": "^8.21.0",
