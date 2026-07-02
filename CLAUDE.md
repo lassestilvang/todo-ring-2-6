@@ -40,6 +40,11 @@ TaskPlanner is a full-featured task management application built with Next.js 16
 - All API routes return `{ success: boolean, data?: any, error?: string }`
 - Use Zod for validation
 - Use the API middleware for error handling
+- **API Versioning**: Routes use `/api/v1/` prefix with version headers
+  - Check `Accept-Version` header for version selection
+  - Default version: `v1`
+  - Latest version: `v2`
+  - Response headers include `API-Version` and deprecation info
 
 ## Common Tasks
 
@@ -105,3 +110,69 @@ SMTP_PASS=your-app-password
 - `c85e800` - feat: add notification scheduler for email and push notifications
 - `c502e98` - test: add load testing script
 - `9597f85` - chore: add cron example for scheduled task processing
+
+## New Features Implemented (v1.1)
+
+### Task Dependencies
+- Visual dependency graph with blocked status indicator
+- Circular dependency detection API
+- Drag-and-drop reordering with dnd-kit
+- Blocked task warnings with badge
+
+### Saved Views Enhancement
+- Save current filter views with custom names/icons
+- Grid and list view layouts
+- View sharing with shareable URLs (7-day expiration)
+- Keyboard shortcut (Ctrl+Shift+S) to save
+- Icon picker with 14 predefined icons
+
+### Time Tracking Reports
+- Time entry list view with editing
+- Weekly/monthly summaries
+- Export to CSV
+- Daily distribution charts
+
+### Template Marketplace
+- Template browsing interface
+- Search and filter templates
+- Template preview modal
+- Rate templates (1-5 stars)
+
+### Calendar Integration
+- Google Calendar OAuth flow
+- Outlook/Microsoft OAuth flow
+- Two-way sync implementation
+- Token refresh support
+
+### Goal → Task Conversion
+- AI-powered task breakdown
+- Milestone tracking
+- Automated task suggestions
+- Progress visualization
+
+### Team Workload Analytics
+- Workload distribution view
+- Capacity planning
+- Overload warnings
+- Velocity charts
+
+### Comment Reactions
+- Emoji reaction support on comments
+- Reaction counts display
+- Filtering by emoji
+- User-specific reaction tracking
+
+### Technical Improvements
+- Base repository pattern with generics
+- QueryBuilder utility for complex queries
+- Transaction support
+- Enhanced API response helpers
+- Performance monitoring dashboard
+- Accessibility features (skip links, focus traps, ARIA)
+
+### New Infrastructure (v1.2)
+- **API Versioning**: Full `/api/v1/` support with version headers
+- **Background Jobs**: BullMQ queue system for email, notifications, reminders
+- **Database Indexes**: Performance indexes for all major tables
+- **Redis Caching**: Server-side caching with Redis and in-memory fallback
+- **New Repositories**: SavedViewRepository, GoalProgressRepository
