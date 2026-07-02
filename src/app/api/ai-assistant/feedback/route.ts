@@ -1,62 +1,23 @@
-import { NextRequest } from 'next/server';
-import { jsonSuccess, jsonError, jsonValidationError } from '@/lib/api-response';
-import { getAIMonitoringService } from '@/lib/monitoring/ai-monitoring.service';
-import { z } from 'zod';
+import { NextRequest, NextResponse } from 'next/server';
+import { AIMonitoringService } from '@/lib/monitoring/ai-monitoring.service';
 
-const FeedbackSchema = z.object({
-  interactionId: z.string().uuid(),
-  userId: z.string(),
-  rating: z.number().min(1).max(5),
-  feedbackText: z.string().optional(),
-  wasHelpful: z.boolean().optional(),
-});
-
-export async function POST(_req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const body = await _req.json();
-    const validated = FeedbackSchema.safeParse(body);
-
-    if (!validated.success) {
-      return jsonValidationError(
-        validated.error.errors.map(e => ({ path: e.path, message: e.message }))
-      );
-    }
-
-    const { interactionId, userId, rating, feedbackText, wasHelpful } = validated.data;
-
-    const result = await getAIMonitoringService().logUserFeedback({
+    const body = await req.json();
+    const { interactionId, userId, rating, feedbackText, wasHelpful } = body;
+    
+    const monitoringService = AIMonitoringService;
+    await monitoringService.logUserFeedback({
       interactionId,
       userId,
       rating,
       feedbackText,
       wasHelpful
     });
-
-    if (!result.success) {
-      return jsonError(result.error || 'Failed to log feedback', 500);
-    }
-
-    return jsonSuccess({ message: 'Feedback recorded successfully' });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to record feedback';
-    return jsonError(message, 500, 'FEEDBACK_ERROR');
-  }
-}
-
-export async function GET(_req: NextRequest) {
-  try {
-    const { searchParams } = new URL(_req.url);
-    const userId = searchParams.get('userId');
-    const days = parseInt(searchParams.get('days') || '7');
-
-    if (!userId) {
-      return jsonError('userId is required', 400, 'MISSING_USER_ID');
-    }
-
-    const metrics = await getAIMonitoringService().getPerformanceMetrics({ userId, days });
-    return jsonSuccess(metrics);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to get metrics';
-    return jsonError(message, 500, 'METRICS_ERROR');
+    
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
