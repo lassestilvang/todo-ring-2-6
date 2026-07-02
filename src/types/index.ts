@@ -268,14 +268,38 @@ export type AutomationRule = z.infer<typeof AutomationRuleSchema>;
 // === Saved View Schema ===
 export const SavedViewSchema = z.object({
   id: z.string(),
+  userId: z.string(),
   name: z.string().min(1, 'Name is required').max(50, 'Name must be less than 50 characters'),
   icon: z.string().default('🔍'),
   filters: z.record(z.any()).default({}),
+  layout: z.enum(['list', 'grid']).default('list'),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 
 export type SavedView = z.infer<typeof SavedViewSchema>;
+
+// === Saved View Share Schema ===
+export const SavedViewShareSchema = z.object({
+  id: z.string(),
+  viewId: z.string(),
+  shareToken: z.string(),
+  expiresAt: z.string().nullable().optional(),
+  createdAt: z.string(),
+});
+
+export type SavedViewShare = z.infer<typeof SavedViewShareSchema>;
+
+// === Goal Progress Schema ===
+export const GoalProgressSchema = z.object({
+  id: z.string(),
+  goalId: z.string(),
+  value: z.number(),
+  recordedAt: z.string(),
+  createdAt: z.string(),
+});
+
+export type GoalProgress = z.infer<typeof GoalProgressSchema>;
 
 // === Notification Settings Schema ===
 export const NotificationSettingsSchema = z.object({
@@ -424,6 +448,19 @@ export const FocusSessionSchema = z.object({
 
 export type FocusSession = z.infer<typeof FocusSessionSchema>;
 
+// === Calendar Connection Schema ===
+export const CalendarConnectionSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  provider: z.enum(['google', 'outlook', 'ical']),
+  accessToken: z.string(),
+  refreshToken: z.string().optional(),
+  expiresAt: z.string().optional(),
+  createdAt: z.string(),
+});
+
+export type CalendarConnection = z.infer<typeof CalendarConnectionSchema>;
+
 // === Team Member Schema ===
 export const TeamMemberSchema = z.object({
   id: z.string().uuid().optional(),
@@ -459,19 +496,3 @@ export const RefreshTokenSchema = z.object({
 });
 
 export type RefreshToken = z.infer<typeof RefreshTokenSchema>;
-
-// === Focus Session Schema ===
-export const FocusSessionSchema = z.object({
-  id: z.string(),
-  taskId: z.string().nullable().optional(),
-  userId: z.string(),
-  duration: z.number().min(1, 'Duration must be at least 1 minute'),
-  startedAt: z.string(),
-  completedAt: z.string().nullable().optional(),
-  status: z.enum(['active', 'completed', 'cancelled']).default('active'),
-  isPomodoro: z.boolean().default(false),
-  pomodorosCompleted: z.number().default(0),
-  breaksTaken: z.number().default(0),
-});
-
-export type FocusSession = z.infer<typeof FocusSessionSchema>;
