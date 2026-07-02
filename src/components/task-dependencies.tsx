@@ -1,12 +1,17 @@
 'use client';
 
 import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Link, Unlink, AlertCircle, CheckCircle2, GitBranch } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link, Unlink, AlertCircle, CheckCircle2, GitBranch, GripVertical, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface TaskDependency {
   id: string;
@@ -16,7 +21,13 @@ interface TaskDependency {
     id: string;
     title: string;
     status: string;
+    sortOrder?: number;
   };
+}
+
+interface TaskDependenciesProps {
+  taskId: string;
+  className?: string;
 }
 
 interface TaskDependenciesProps {
@@ -28,6 +39,15 @@ export function TaskDependencies({ taskId, className }: TaskDependenciesProps) {
   const [isAdding, setIsAdding] = React.useState(false);
   const [newDependencyId, setNewDependencyId] = React.useState('');
   const [isGraphOpen, setIsGraphOpen] = React.useState(false);
+  const [isCheckingCircular, setIsCheckingCircular] = React.useState(false);
+  const queryClient = useQueryClient();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const { data: dependencies = [], isLoading, refetch } = useQuery({
     queryKey: ['dependencies', taskId],
@@ -35,6 +55,40 @@ export function TaskDependencies({ taskId, className }: TaskDependenciesProps) {
       const res = await fetch(`/api/dependencies?taskId=${taskId}`);
       const json = await res.json();
       return json.success ? json.data : [];
+    },
+  });
+
+  // Mutation to add dependency with circular check
+  const addMutation = useMutation({
+    mutationFn: async (dependsOnId: string) => {
+      setIsCheckingCircular(true);
+      // First check if adding this dependency would create a cycle
+      const checkRes = await fetch(`/api/dependencies/check-cycle?taskId=${taskId}&dependsOnId=${dependsOnId}`);
+      const checkJson = await checkRes.json();
+
+      if (checkJson.success && checkJson.hasCycle) {
+        throw new Error('This dependency would create a circular reference');
+      }
+
+      const res = await fetch('/api/dependencies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, dependsOnId }),
+      });
+      if (!res.ok) throw new Error('Failed to add dependency');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dependencies', taskId] });
+      setNewDependencyId('');
+      setIsAdding(false);
+      toast.success('Dependency added');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to add dependency');
+    },
+    onSettled: () => {
+      setIsCheckingCircular(false);
     },
   });
 
@@ -49,28 +103,82 @@ export function TaskDependencies({ taskId, className }: TaskDependenciesProps) {
 
   const handleAddDependency = async () => {
     if (!newDependencyId) return;
-    try {
-      const res = await fetch('/api/dependencies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, dependsOnId: newDependencyId }),
-      });
-      if (res.ok) {
-        setNewDependencyId('');
-        setIsAdding(false);
-        refetch();
-      }
-    } catch (error) {
-      console.error('Failed to add dependency:', error);
-    }
+    addMutation.mutate(newDependencyId);
   };
 
   const handleRemoveDependency = async (depId: string) => {
     try {
       const res = await fetch(`/api/dependencies?id=${depId}`, { method: 'DELETE' });
-      if (res.ok) refetch();
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ['dependencies', taskId] });
+        toast.success('Dependency removed');
+      }
     } catch (error) {
       console.error('Failed to remove dependency:', error);
+    }
+  };
+
+  // Sortable item component for drag-and-drop
+  function SortableDependency({ dep }: { dep: TaskDependency & { task?: any } }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+      id: dep.id,
+      data: { type: 'dependency', dep },
+    });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={cn(
+          'flex items-center justify-between p-2 bg-muted/30 rounded-lg text-sm',
+          dep.task?.status === 'completed' && 'opacity-60'
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab p-1 hover:bg-muted rounded touch-none"
+            title="Drag to reorder"
+          >
+            <GripVertical className="w-3 h-3 text-muted-foreground" />
+          </button>
+          {dep.task?.status === 'completed' ? (
+            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+          ) : (
+            <AlertCircle className="w-3 h-3 text-amber-500" />
+          )}
+          <span>{dep.task?.title || 'Unknown task'}</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleRemoveDependency(dep.id)}
+          className="h-6 w-6 p-0"
+        >
+          <Unlink className="w-3 h-3" />
+        </Button>
+      </div>
+    );
+  }
+
+  // Handle drag end for reordering
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      const ordered = arrayMove(
+        dependencies,
+        dependencies.findIndex((d: TaskDependency) => d.id === active.id),
+        dependencies.findIndex((d: TaskDependency) => d.id === over.id)
+      );
+      // TODO: Implement API call to update sort order
     }
   };
 
@@ -144,34 +252,19 @@ export function TaskDependencies({ taskId, className }: TaskDependenciesProps) {
       {dependencies.length === 0 ? (
         <p className="text-xs text-muted-foreground/60">No dependencies configured</p>
       ) : (
-        <div className="space-y-2">
-          {dependencies.map((dep: TaskDependency & { task?: any }) => (
-            <div
-              key={dep.id}
-              className={cn(
-                'flex items-center justify-between p-2 bg-muted/30 rounded-lg text-sm',
-                dep.task?.status === 'completed' && 'opacity-60'
-              )}
-            >
-              <div className="flex items-center gap-2">
-                {dep.task?.status === 'completed' ? (
-                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                ) : (
-                  <AlertCircle className="w-3 h-3 text-amber-500" />
-                )}
-                <span>{dep.task?.title || 'Unknown task'}</span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleRemoveDependency(dep.id)}
-                className="h-6 w-6 p-0"
-              >
-                <Unlink className="w-3 h-3" />
-              </Button>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={dependencies} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {dependencies.map((dep: TaskDependency & { task?: any }) => (
+                <SortableDependency key={dep.id} dep={dep} />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Dependency Graph Dialog */}
