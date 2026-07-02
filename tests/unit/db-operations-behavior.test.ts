@@ -730,8 +730,9 @@ describe('Database Operations - Behavior Tests', () => {
     });
 
     it('should export deleteRefreshToken function', async () => {
-      const { deleteRefreshToken } = await import('../../db/operations');
+      const { deleteRefreshToken, deleteRefreshTokenByToken } = await import('../../db/operations');
       expect(typeof deleteRefreshToken).toBe('function');
+      expect(typeof deleteRefreshTokenByToken).toBe('function');
     });
   });
 });
