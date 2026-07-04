@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Analytics API response structure 1`] = `
+{
+  "dailyCompletion": ArrayContaining [
+    ObjectContaining {
+      "count": Any<Number>,
+      "date": Any<String>,
+    },
+  ],
+  "timestamp": Any<String>,
+}
+`;
+
+exports[`Dashboard API response structure 1`] = `
+{
+  "productivity": Any<Object>,
+  "stats": Any<Object>,
+  "timestamp": Any<String>,
+}
+`;
