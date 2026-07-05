@@ -229,6 +229,121 @@ export class TaskRepository {
   private camelToSnake(str: string): string {
     return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
   }
+
+  /**
+   * Clone a task with optional modifications
+   */
+  clone(taskId: string, options: {
+    resetStatus?: boolean;
+    resetDate?: boolean;
+    newDate?: string;
+    duplicateSubtasks?: boolean;
+    newListId?: string;
+    titlePrefix?: string;
+  } = {}): Task | null {
+    const original = this.findById(taskId);
+    if (!original) return null;
+
+    const now = new Date().toISOString();
+    const newId = crypto.randomUUID();
+
+    this.db.prepare(`
+      INSERT INTO tasks (id, title, description, list_id, date, deadline, reminder_time,
+       estimate_hours, estimate_minutes, actual_hours, actual_minutes, priority, status,
+       recurring_type, recurring_interval, is_all_day, is_habit, completed_at, sort_order,
+       created_at, updated_at, assignee_id, assignee_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      newId,
+      options.titlePrefix
+        ? `${options.titlePrefix} ${original.title}`
+        : original.title,
+      original.description || '',
+      options.newListId || original.listId,
+      options.resetDate ? (options.newDate || null) : original.date,
+      original.deadline,
+      original.reminderTime,
+      original.estimateHours,
+      original.estimateMinutes,
+      0, 0, // Reset actual time
+      original.priority,
+      options.resetStatus ? 'pending' : original.status,
+      original.recurringType,
+      original.recurringInterval,
+      original.isAllDay ? 1 : 0,
+      original.isHabit ? 1 : 0,
+      null, // Reset completed_at
+      original.sortOrder,
+      now, now,
+      original.assigneeId,
+      original.assigneeName
+    );
+
+    // Duplicate labels if they exist
+    if (original.labels && original.labels.length > 0) {
+      const labelStmt = this.db.prepare(
+        'INSERT OR IGNORE INTO task_labels (id, task_id, label_id) VALUES (?, ?, ?)'
+      );
+      for (const labelId of original.labels) {
+        labelStmt.run(crypto.randomUUID(), newId, labelId);
+      }
+    }
+
+    return this.findById(newId)!;
+  }
+
+  /**
+   * Bulk update multiple tasks
+   */
+  bulkUpdate(ids: string[], data: Partial<Omit<Task, 'id'>>): number {
+    if (ids.length === 0) return 0;
+
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    const fields = [
+      'title', 'description', 'listId', 'date', 'deadline', 'reminderTime',
+      'estimateHours', 'estimateMinutes', 'actualHours', 'actualMinutes',
+      'priority', 'status', 'recurringType', 'recurringInterval',
+      'isAllDay', 'isHabit', 'completedAt', 'sortOrder',
+      'assigneeId', 'assigneeName'
+    ];
+
+    for (const field of fields) {
+      if (data[field] !== undefined) {
+        const dbField = this.camelToSnake(field);
+        updates.push(`${dbField} = ?`);
+        values.push(data[field]);
+      }
+    }
+
+    if (updates.length === 0) return 0;
+
+    updates.push('updated_at = ?');
+    values.push(new Date().toISOString());
+
+    const placeholders = ids.map(() => '?').join(',');
+    values.push(...ids);
+
+    const stmt = this.db.prepare(
+      `UPDATE tasks SET ${updates.join(', ')} WHERE id IN (${placeholders})`
+    );
+    stmt.run(...values);
+
+    return ids.length;
+  }
+
+  /**
+   * Bulk delete multiple tasks
+   */
+  bulkDelete(ids: string[]): number {
+    if (ids.length === 0) return 0;
+
+    const placeholders = ids.map(() => '?').join(',');
+    this.db.prepare(`DELETE FROM tasks WHERE id IN (${placeholders})`).run(...ids);
+
+    return ids.length;
+  }
 }
 
 // Singleton instance
