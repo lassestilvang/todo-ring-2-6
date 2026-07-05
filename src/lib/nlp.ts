@@ -1,4 +1,4 @@
-import { format, addDays } from 'date-fns';
+import { format, addDays, addWeeks, addMonths } from 'date-fns';
 import type { NaturalLanguageParseResult } from './validations';
 
 /**
@@ -8,6 +8,9 @@ import type { NaturalLanguageParseResult } from './validations';
  * - "Review PR #123 next monday"
  * - "Call mom today"
  * - "Buy groceries by friday"
+ * - "Every Tuesday and Thursday" (recurring)
+ * - "Estimate 2h 30m" (time tracking)
+ * - "everyday at 9am" (habit)
  */
 export function parseNaturalLanguage(input: string): NaturalLanguageParseResult {
   const result: NaturalLanguageParseResult = {
@@ -15,6 +18,55 @@ export function parseNaturalLanguage(input: string): NaturalLanguageParseResult 
   };
 
   const lowerInput = input.toLowerCase();
+
+  // === Recurring Pattern Detection ===
+  const recurringPatterns = [
+    { pattern: /\b(every\s+day|daily|each\s+day)\b/i, value: 'daily' },
+    { pattern: /\b(every\s+week|weekly|each\s+week)\b/i, value: 'weekly' },
+    { pattern: /\b(every\s+month|monthly|each\s+month)\b/i, value: 'monthly' },
+    { pattern: /\b(weekdays|weekday|Mondays?\s+to\s+Fridays?)\b/i, value: 'weekdays' },
+    { pattern: /\b(every\s+year|yearly|annual|annually)\b/i, value: 'yearly' },
+  ];
+
+  for (const { pattern, value } of recurringPatterns) {
+    if (pattern.test(input)) {
+      result.recurringType = value;
+      // Extract interval if specified (e.g., "every 2 days")
+      const intervalMatch = input.match(/every\s+(\d+)\s+(day|week|month|year)/i);
+      if (intervalMatch && intervalMatch[1]) {
+        result.recurringInterval = intervalMatch[1];
+      }
+      break;
+    }
+  }
+
+  // === Time Estimate Detection ===
+  // Match patterns like "2h 30m", "Estimate 2h", "takes 30 minutes"
+  const timeEstimatePatterns = input.match(/(?:estimate:?|takes?|about|~)?\s*(\d+)\s*(h|hr|hour|hours|m|min|mins|minute|minutes)/gi);
+  if (timeEstimatePatterns) {
+    for (const match of timeEstimatePatterns) {
+      const hoursMatch = match.match(/(\d+)\s*(h|hr|hour|hours)/i);
+      const minutesMatch = match.match(/(\d+)\s*(m|min|mins|minute|minutes)/i);
+      if (hoursMatch && hoursMatch[1]) {
+        result.estimateHours = (result.estimateHours || 0) + parseInt(hoursMatch[1], 10);
+      }
+      if (minutesMatch && minutesMatch[1]) {
+        result.estimateMinutes = (result.estimateMinutes || 0) + parseInt(minutesMatch[1], 10);
+      }
+    }
+    // Normalize minutes to hours if >= 60
+    if (result.estimateMinutes && result.estimateMinutes >= 60) {
+      result.estimateHours = (result.estimateHours || 0) + Math.floor(result.estimateMinutes / 60);
+      result.estimateMinutes = result.estimateMinutes % 60;
+    }
+  }
+
+  // === List Detection ===
+  const listMatch = input.match(/#\s*(\w+)|^in\s+(my\s+)?(inbox|work|personal|shopping|projects?)\b/i);
+  if (listMatch) {
+    result.listId = listMatch[1] || listMatch[3];
+    result.title = input.replace(listMatch[0], '').trim();
+  }
 
   // Priority detection
   if (lowerInput.includes('!!!') || lowerInput.includes('urgent') || lowerInput.includes('asap')) {
@@ -176,6 +228,60 @@ export interface SearchQuery {
   terms: string[];
   excludes: string[];
   filters: Record<string, string>;
+}
+
+/**
+ * Smart Priority Prediction
+ * Analyzes task content and context to suggest appropriate priority
+ */
+export function predictPriority(task: {
+  title: string;
+  description?: string;
+  deadline?: string;
+  estimateHours?: number;
+  estimateMinutes?: number;
+  date?: string;
+}): 'high' | 'medium' | 'low' | 'none' {
+  const text = `${task.title} ${task.description || ''}`.toLowerCase();
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
+
+  // High priority indicators
+  const highPriorityKeywords = ['urgent', 'asap', 'critical', 'important', 'deadline', 'submit', 'due', 'emergency', 'crisis', 'blocker', 'release', 'launch', 'meeting', 'call', 'presentation'];
+  if (highPriorityKeywords.some(k => text.includes(k))) {
+    return 'high';
+  }
+
+  // Medium priority indicators
+  const mediumPriorityKeywords = ['review', 'update', 'prepare', 'follow', 'feedback', 'discuss', 'plan', 'organize'];
+  if (mediumPriorityKeywords.some(k => text.includes(k))) {
+    return 'medium';
+  }
+
+  // Deadline-based priority
+  if (task.deadline) {
+    const deadlineDate = new Date(task.deadline);
+    const daysUntilDue = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysUntilDue <= 0) return 'high';
+    if (daysUntilDue <= 2) return 'high';
+    if (daysUntilDue <= 7) return 'medium';
+  }
+
+  // Date-based priority (today or tomorrow)
+  if (task.date) {
+    if (task.date === todayStr) return 'high';
+    const taskDate = new Date(task.date);
+    const daysUntil = Math.ceil((taskDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysUntil <= 1) return 'high';
+    if (daysUntil <= 3) return 'medium';
+  }
+
+  // Time estimate-based priority (longer tasks get higher priority)
+  const totalMinutes = (task.estimateHours || 0) * 60 + (task.estimateMinutes || 0);
+  if (totalMinutes >= 120) return 'medium';
+  if (totalMinutes >= 60) return 'low';
+
+  return 'none';
 }
 
 export function parseSearchQuery(query: string): SearchQuery {
