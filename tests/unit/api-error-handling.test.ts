@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { jsonUnauthorized, jsonForbidden, jsonRateLimit } from '../../src/lib/api-response';
+import { ErrorCodes } from '../../src/lib/error-codes';
 
 describe('API Error Helpers', () => {
   describe('jsonUnauthorized', () => {
@@ -8,7 +9,7 @@ describe('API Error Helpers', () => {
       const result = await response.json();
       expect(result.success).toBe(false);
       expect(result.error).toBe('Authentication required');
-      expect(result.code).toBe('UNAUTHORIZED');
+      expect(result.code).toBe(ErrorCodes.UNAUTHORIZED);
       expect(response.status).toBe(401);
     });
   });
@@ -19,7 +20,7 @@ describe('API Error Helpers', () => {
       const result = await response.json();
       expect(result.success).toBe(false);
       expect(result.error).toContain('Forbidden');
-      expect(result.code).toBe('FORBIDDEN');
+      expect(result.code).toBe(ErrorCodes.FORBIDDEN);
     });
 
     it('should return forbidden error with custom action', async () => {
@@ -35,7 +36,7 @@ describe('API Error Helpers', () => {
       const result = await response.json();
       expect(result.success).toBe(false);
       expect(result.error).toBe('Too many requests');
-      expect(result.code).toBe('RATE_LIMITED');
+      expect(result.code).toBe(ErrorCodes.RATE_LIMITED);
       expect(response.status).toBe(429);
     });
 
