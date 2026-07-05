@@ -1,0 +1,18 @@
+{
+  "extends": "@tsconfig/react-native/tsconfig.json",
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "jsx": "react-native",
+    "strict": true,
+    "noEmit": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": ["jest", "node"]
+  },
+  "include": ["screens/**/*.ts", "screens/**/*.tsx", "components/**/*.ts", "components/**/*.tsx"],
+  "exclude": ["node_modules", "babel.config.js"]
+}
