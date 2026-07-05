@@ -30,11 +30,6 @@ interface TaskDependenciesProps {
   className?: string;
 }
 
-interface TaskDependenciesProps {
-  taskId: string;
-  className?: string;
-}
-
 export function TaskDependencies({ taskId, className }: TaskDependenciesProps) {
   const [isAdding, setIsAdding] = React.useState(false);
   const [newDependencyId, setNewDependencyId] = React.useState('');
