@@ -124,7 +124,7 @@ export function getErrorMessage(code: ErrorCode): string {
     CONFLICT_ALREADY_EXISTS: 'Resource already exists',
 
     // Rate limiting
-    RATE_LIMITED: 'Too many requests. Please try again later.',
+    RATE_LIMITED: 'Too many requests',
 
     // Server errors
     SERVER_INTERNAL_ERROR: 'An internal server error occurred',
