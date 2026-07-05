@@ -28,4 +28,6 @@ export const MIGRATION_FILES = [
   '021_performance_indexes.sql',
   '022_recurring_task_exceptions.sql',
   '023_soft_delete.sql',
+  '024_habit_stacking.sql',
+  '025_focus_time_budgets.sql',
 ] as const;
