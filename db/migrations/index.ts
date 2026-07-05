@@ -25,6 +25,7 @@ export const MIGRATION_FILES = [
   '018_comment_reactions.sql',
   '019_saved_views.sql',
   '020_goal_progress.sql',
-  '021_indexes.sql',
+  '021_performance_indexes.sql',
   '022_recurring_task_exceptions.sql',
+  '023_soft_delete.sql',
 ] as const;
