@@ -672,3 +672,33 @@ CREATE TABLE IF NOT EXISTS batch_tasks (
 
 CREATE INDEX IF NOT EXISTS idx_batch_tasks_batch ON batch_tasks(batch_id);
 CREATE INDEX IF NOT EXISTS idx_batch_tasks_task ON batch_tasks(task_id);
+
+-- Habit Stacking table (behavior chaining)
+CREATE TABLE IF NOT EXISTS habit_stacks (
+  id TEXT PRIMARY KEY,
+  anchor_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  linked_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(anchor_task_id, linked_task_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_habit_stacks_anchor ON habit_stacks(anchor_task_id);
+CREATE INDEX IF NOT EXISTS idx_habit_stacks_linked ON habit_stacks(linked_task_id);
+
+-- Focus Time Budgets table
+CREATE TABLE IF NOT EXISTS focus_time_budgets (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  daily_limit REAL DEFAULT 8,
+  weekly_limit REAL DEFAULT 40,
+  work_start_hour INTEGER DEFAULT 9,
+  work_end_hour INTEGER DEFAULT 17,
+  quiet_hours_start TEXT DEFAULT '22:00',
+  quiet_hours_end TEXT DEFAULT '08:00',
+  burnout_warning_threshold REAL DEFAULT 0.8,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_focus_budgets_user ON focus_time_budgets(user_id);
