@@ -238,6 +238,11 @@ export interface NaturalLanguageParseResult {
   time?: string;
   deadline?: string;
   priority?: 'high' | 'medium' | 'low' | 'none';
+  recurringType?: 'none' | 'daily' | 'weekly' | 'weekdays' | 'monthly' | 'yearly';
+  recurringInterval?: string;
+  estimateHours?: number;
+  estimateMinutes?: number;
+  listId?: string;
 }
 
 // Register Schema
@@ -332,6 +337,63 @@ export const AIAssistantSchema = z.object({
     })).optional(),
   }).optional(),
 });
+
+// Template Variable Support
+// Variables are denoted with {{variableName}} in templates
+const BUILT_IN_VARIABLES = [
+  { key: 'date', label: 'Current Date', example: '2024-01-15' },
+  { key: 'today', label: 'Today', example: 'Monday, January 15' },
+  { key: 'tomorrow', label: 'Tomorrow', example: 'Tuesday, January 16' },
+  { key: 'user', label: 'Your Name', example: 'John' },
+  { key: 'weekday', label: 'Current Weekday', example: 'Monday' },
+  { key: 'time', label: 'Current Time', example: '2:30 PM' },
+  { key: 'project', label: 'Project Name (if any)', example: 'Website Redesign' },
+];
+
+export interface TemplateVariable {
+  key: string;
+  label: string;
+  example: string;
+}
+
+export const BUILTIN_TEMPLATE_VARIABLES: TemplateVariable[] = BUILT_IN_VARIABLES;
+
+/**
+ * Extract variables from a template string
+ * Returns array of unique variable keys found in {{variable}} format
+ */
+export function extractTemplateVariables(template: string): string[] {
+  const matches = template.match(/{{(\w+)}}/g);
+  if (!matches) return [];
+  return [...new Set(matches.map(m => m.slice(2, -2)))];
+}
+
+/**
+ * Replace variables in template with values
+ * Built-in variables are auto-resolved, custom values are passed in
+ */
+export function resolveTemplateVariables(
+  template: string,
+  customValues: Record<string, string> = {}
+): string {
+  const today = new Date();
+
+  const builtInValues: Record<string, string> = {
+    date: format(today, 'yyyy-MM-dd'),
+    today: format(today, 'EEEE, MMMM d'),
+    tomorrow: format(addDays(today, 1), 'EEEE, MMMM d'),
+    user: customValues.user || '',
+    weekday: format(today, 'EEEE'),
+    time: format(today, 'h:mm a'),
+    project: customValues.project || '',
+    ...customValues,
+  };
+
+  return template.replace(/{{\w+}}/g, (match) => {
+    const key = match.slice(2, -2);
+    return builtInValues[key] || customValues[key] || match;
+  });
+}
 
 // Helper function to validate and parse
 export function validateSchema<T>(schema: z.ZodSchema<T>, data: unknown): T {
