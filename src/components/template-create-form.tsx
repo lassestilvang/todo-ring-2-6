@@ -16,7 +16,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { extractTemplateVariables, BUILTIN_TEMPLATE_VARIABLES, type TemplateVariable } from '@/lib/validations';
 
 const templateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -104,6 +106,19 @@ export function TemplateCreateForm({ onClose }: TemplateCreateFormProps) {
         />
         {form.formState.errors.title && (
           <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>
+        )}
+        {extractTemplateVariables(form.getValues('title')).length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap mt-2">
+            <span className="text-xs text-muted-foreground">Variables:</span>
+            {extractTemplateVariables(form.getValues('title')).map(v => {
+              const varInfo = BUILTIN_TEMPLATE_VARIABLES.find(bv => bv.key === v);
+              return (
+                <Badge key={v} variant="secondary" className="text-xs">
+                  {`{{${v}}}`}
+                </Badge>
+              );
+            })}
+          </div>
         )}
       </div>
 
