@@ -171,7 +171,8 @@ describe('Bulletproof Edge Cases', () => {
 
     it('should validate error response format', async () => {
       const { jsonError } = await import('../../src/lib/api-response');
-      const response = jsonError('Something went wrong', 500, 'ERROR_CODE');
+      const { ErrorCodes } = await import('../../src/lib/error-codes');
+      const response = jsonError('Something went wrong', 500, ErrorCodes.INTERNAL_ERROR);
       const body = await response.json();
       expect(body.success).toBe(false);
       expect(body.error).toBe('Something went wrong');
@@ -183,6 +184,7 @@ describe('Bulletproof Edge Cases', () => {
       const body = await response.json();
       expect(body.success).toBe(false);
       expect(body.details).toHaveLength(1);
+      expect(body.details?.[0].message).toBe('Required');
     });
   });
 
