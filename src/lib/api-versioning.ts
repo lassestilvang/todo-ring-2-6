@@ -6,10 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Supported API versions
-export const SUPPORTED_VERSIONS = ['v1', 'v2'] as const;
+export const SUPPORTED_VERSIONS = ['v1'] as const;
 export const DEFAULT_VERSION = 'v1' as const;
-export const LATEST_VERSION = 'v2' as const;
-export type ApiVersion = typeof DEFAULT_VERSION | typeof LATEST_VERSION;
+export type ApiVersion = typeof DEFAULT_VERSION;
 
 /**
  * Extract API version from request
@@ -41,29 +40,15 @@ export function stripVersionPrefix(pathname: string): string {
 }
 
 /**
- * Version mapping for backward compatibility
- * Maps older versions to their latest equivalents
- */
-export const VERSION_MIGRATIONS: Record<string, string> = {
-  'v1': 'v2', // v1 maps to v2 with deprecation warning
-};
-
-/**
  * Deprecation timeline for API versions
  */
-export const DEPRECATION_TIMELINE = {
-  'v1': {
-    deprecated: '2025-01-01',
-    sunset: '2025-12-31',
-    migrationGuide: '/docs/migration/v1-to-v2',
-  },
-} as const;
+export const DEPRECATION_TIMELINE = {} as const;
 
 /**
  * Get deprecation info for a version
  */
 export function getDeprecationInfo(version: ApiVersion): { deprecated: string; sunset: string; migrationGuide: string } | null {
-  return DEPRECATION_TIMELINE[version as keyof typeof DEPRECATION_TIMELINE] || null;
+  return null;
 }
 
 /**
@@ -86,7 +71,7 @@ export function addVersionHeaders(response: NextResponse, version: ApiVersion): 
  * Check if version is deprecated
  */
 export function isVersionDeprecated(version: ApiVersion): boolean {
-  return version !== LATEST_VERSION;
+  return false;
 }
 
 /**
