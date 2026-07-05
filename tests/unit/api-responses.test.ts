@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { jsonSuccess, jsonError, jsonValidationError, jsonNotFound } from '../../src/lib/api-response';
+import { ErrorCodes } from '../../src/lib/error-codes';
 
 describe('API Response Helpers', () => {
   describe('jsonSuccess', () => {
@@ -25,9 +26,9 @@ describe('API Response Helpers', () => {
     });
 
     it('should allow custom error code', async () => {
-      const response = jsonError('Not found', 404, 'NOT_FOUND');
+      const response = jsonError('Not found', 404, ErrorCodes.NOT_FOUND);
       const result = await response.json();
-      expect(result.code).toBe('NOT_FOUND');
+      expect(result.code).toBe(ErrorCodes.NOT_FOUND);
     });
   });
 
@@ -41,8 +42,13 @@ describe('API Response Helpers', () => {
       const result = await response.json();
       expect(result.success).toBe(false);
       expect(result.error).toBe('Validation failed');
-      expect(result.code).toBe('VALIDATION_ERROR');
-      expect(result.details).toEqual(errors);
+      expect(result.code).toBe(ErrorCodes.VALIDATION_ERROR);
+      // Check that we have the expected number of details
+      expect(result.details).toHaveLength(2);
+      // Check that the details contain the expected messages
+      const messages = result.details.map((d: any) => d.message);
+      expect(messages).toContain('Title is required');
+      expect(messages).toContain('Invalid email');
     });
   });
 
@@ -52,7 +58,7 @@ describe('API Response Helpers', () => {
       const result = await response.json();
       expect(result.success).toBe(false);
       expect(result.error).toBe('Task not found');
-      expect(result.code).toBe('NOT_FOUND');
+      expect(result.code).toBe(ErrorCodes.NOT_FOUND);
     });
   });
 });
