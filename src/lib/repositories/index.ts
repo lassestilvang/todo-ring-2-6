@@ -45,3 +45,4 @@ export { RecurringExceptionRepository, getRecurringExceptionRepository } from '.
 // New repositories
 export { SavedViewRepository, getSavedViewRepository } from './saved-view-repository';
 export { GoalProgressRepository, getGoalProgressRepository } from './goal-progress-repository';
+export { HabitStackRepository, getHabitStackRepository } from './habit-stack-repository';
