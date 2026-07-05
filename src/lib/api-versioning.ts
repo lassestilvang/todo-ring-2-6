@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Supported API versions
-export const SUPPORTED_VERSIONS = ['v1'] as const;
+export const SUPPORTED_VERSIONS = ['v1', 'v2'] as const;
 export const DEFAULT_VERSION = 'v1' as const;
+export const LATEST_VERSION = 'v2' as const;
 export type ApiVersion = typeof DEFAULT_VERSION;
 
 /**
