@@ -54,7 +54,7 @@ import { useTaskStore } from '@/hooks/use-task-store';
 import { TaskDetailDialog } from '@/components/task-detail-dialog';
 import { KanbanBoard } from '@/components/kanban-board';
 import { CalendarView } from '@/components/calendar-view';
-const { GanttChart } = await import('@/app/gantt-chart');
+import { GanttChart } from '@/components/gantt-chart';
 import { TaskFilter } from '@/components/task-filter';
 import { TaskTemplates } from '@/components/task-templates';
 import { BulkActions } from '@/components/bulk-actions';
@@ -1114,7 +1114,9 @@ export default function HomePage() {
               />
             ) : viewMode === 'calendar' ? (
               <CalendarView onTaskSelect={setSelectedTask} />
-            ) : viewMode === 'gantt' ? await handleViewChange('gantt') : (
+            ) : viewMode === 'gantt' ? (
+              <GanttChart tasks={tasks} onTaskSelect={setSelectedTask} />
+            ) : (
               <>
                 <QuickAdd onAdd={handleAdd} />
                 {filteredTasks.length === 0 && !isLoading ? (
