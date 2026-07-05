@@ -8,6 +8,7 @@ import { sanitizeObject } from './sanitize';
 import { jsonError, jsonValidationError, ErrorCodes, ErrorCode, ApiResponse } from './api-response';
 import { verifyJwt } from './jwt';
 import { extractApiVersion } from './api-versioning';
+import { ApiError, getErrorMessage } from './error-codes';
 
 export interface MiddlewareResult {
   shouldProceed: boolean;
@@ -24,6 +25,20 @@ export type ApiHandler<T = any> = (
   request: NextRequest,
   context: ApiContext
 ) => Promise<T | NextResponse> | T | Promise<NextResponse>;
+
+/**
+ * Get client identifier for rate limiting
+ */
+function getClientKey(req: NextRequest): string {
+  const apiKey = req.headers.get('x-api-key');
+  if (apiKey) return `api:${apiKey}`;
+
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+             req.headers.get('x-real-ip') ||
+             'unknown';
+
+  return `ip:${ip}`;
+}
 
 /**
  * Apply rate limiting to API requests
@@ -43,7 +58,7 @@ export function applyRateLimit(
         {
           success: false,
           error: 'Too many requests',
-          code: 'RATE_LIMITED',
+          code: ErrorCodes.RATE_LIMITED,
         },
         {
           status: 429,
@@ -66,20 +81,6 @@ export function applyRateLimit(
  */
 export function sanitizeBody(body: Record<string, any>): Record<string, any> {
   return sanitizeObject(body);
-}
-
-/**
- * Get client identifier for rate limiting
- */
-function getClientKey(req: NextRequest): string {
-  const apiKey = req.headers.get('x-api-key');
-  if (apiKey) return `api:${apiKey}`;
-
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-             req.headers.get('x-real-ip') ||
-             'unknown';
-
-  return `ip:${ip}`;
 }
 
 /**
@@ -116,7 +117,7 @@ export function withMiddleware<T = any>(
         sanitizedBody = sanitizeObject(body);
       } catch {
         return NextResponse.json(
-          { success: false, error: 'Invalid JSON', code: 'INVALID_JSON' },
+          { success: false, error: 'Invalid JSON', code: 'VAL_BAD_REQUEST' },
           { status: 400 }
         );
       }
@@ -152,7 +153,10 @@ export function createApiMiddleware(config: { requireAuth?: boolean; validateVer
         const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
         if (!token) {
-          return jsonError('Authentication required', 401, ErrorCodes.UNAUTHORIZED);
+          return NextResponse.json(
+            new ApiError(ErrorCodes.UNAUTHORIZED, getErrorMessage(ErrorCodes.UNAUTHORIZED), 401).toJSON(),
+            { status: 401 }
+          );
         }
 
         try {
@@ -163,7 +167,10 @@ export function createApiMiddleware(config: { requireAuth?: boolean; validateVer
             name: decoded.name,
           };
         } catch (error) {
-          return jsonError('Invalid or expired token', 401, ErrorCodes.INVALID_TOKEN);
+          return NextResponse.json(
+            new ApiError(ErrorCodes.INVALID_TOKEN, getErrorMessage(ErrorCodes.INVALID_TOKEN), 401).toJSON(),
+            { status: 401 }
+          );
         }
       }
 
@@ -178,27 +185,18 @@ export function createApiMiddleware(config: { requireAuth?: boolean; validateVer
       // Wrap successful result
       return NextResponse.json<ApiResponse>({ success: true, data: result });
     } catch (error) {
-      // Handle validation errors
-      if (error instanceof ValidationError) {
-        return jsonValidationError(
-          error.errors.map(e => ({ path: e.path, message: e.message }))
-        );
-      }
-
-      // Handle known error codes
-      const knownError = error as KnownApiError;
-      if (knownError.code && Object.values(ErrorCodes).includes(knownError.code as ErrorCode)) {
-        return jsonError(
-          knownError.message || 'An error occurred',
-          knownError.status || 500,
-          knownError.code
-        );
+      // Handle ApiError instances
+      if (error instanceof ApiError) {
+        return NextResponse.json(error.toJSON(), { status: error.statusCode });
       }
 
       // Handle unexpected errors
       const message = error instanceof Error ? error.message : 'Internal server error';
       console.error('API Error:', error);
-      return jsonError(message, 500, ErrorCodes.INTERNAL_ERROR);
+      return NextResponse.json(
+        new ApiError(ErrorCodes.INTERNAL_ERROR, message, 500).toJSON(),
+        { status: 500 }
+      );
     }
   };
 }
@@ -218,14 +216,6 @@ export class ValidationError extends Error {
     super('Validation failed');
     this.name = 'ValidationError';
   }
-}
-
-/**
- * KnownApiError for typed error handling
- */
-export interface KnownApiError extends Error {
-  code?: ErrorCode;
-  status?: number;
 }
 
 /**
