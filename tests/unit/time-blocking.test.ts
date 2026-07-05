@@ -38,8 +38,7 @@ describe('Time Blocking Service', () => {
 
   describe('Time Block Creation', () => {
     it('should generate unique ID', async () => {
-      const { v4 } = await import('uuid');
-      const id = v4();
+      const id = crypto.randomUUID();
       expect(id).toBeDefined();
       expect(typeof id).toBe('string');
     });
