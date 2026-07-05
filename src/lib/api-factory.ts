@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { jsonSuccess, jsonError, jsonValidationError } from './api-response';
-import { ErrorCodes } from './error-codes';
+import { ErrorCodes, getErrorMessage, ApiError } from './error-codes';
 import { extractApiVersion, addVersionHeaders } from './api-versioning';
 import { rateLimit } from './rate-limiter';
 import { sanitizeObject } from './sanitize';
@@ -61,17 +61,19 @@ export function createVersionedHandler(
 
       const rateResult = rateLimit(getClientKey(request), rateLimitValue);
       if (!rateResult.success) {
-        return NextResponse.json(
-          { success: false, error: 'Too many requests', code: ErrorCodes.RATE_LIMITED },
-          {
-            status: 429,
-            headers: {
-              'Retry-After': Math.ceil(rateResult.reset / 1000).toString(),
-              'X-RateLimit-Limit': rateResult.limit.toString(),
-              'X-RateLimit-Remaining': rateResult.remaining.toString(),
-              'X-RateLimit-Reset': Math.ceil(rateResult.reset / 1000).toString(),
+        return addVersionHeaders(
+          NextResponse.json(
+            new ApiError(ErrorCodes.RATE_LIMITED, getErrorMessage(ErrorCodes.RATE_LIMITED), 429).toJSON(),
+            {
+              headers: {
+                'Retry-After': Math.ceil(rateResult.reset / 1000).toString(),
+                'X-RateLimit-Limit': rateResult.limit.toString(),
+                'X-RateLimit-Remaining': rateResult.remaining.toString(),
+                'X-RateLimit-Reset': Math.ceil(rateResult.reset / 1000).toString(),
+              },
             }
-          }
+          ),
+          version
         );
       }
     }
@@ -82,11 +84,13 @@ export function createVersionedHandler(
       const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
       if (!token) {
-        const response = NextResponse.json(
-          { success: false, error: 'Authentication required', code: ErrorCodes.UNAUTHORIZED },
-          { status: 401 }
+        return addVersionHeaders(
+          NextResponse.json(
+            new ApiError(ErrorCodes.UNAUTHORIZED, getErrorMessage(ErrorCodes.UNAUTHORIZED), 401).toJSON(),
+            { status: 401 }
+          ),
+          version
         );
-        return addVersionHeaders(response, version);
       }
 
       try {
@@ -94,11 +98,13 @@ export function createVersionedHandler(
         context.user = { id: decoded.sub, email: '' };
         context.isAuthenticated = true;
       } catch {
-        const response = NextResponse.json(
-          { success: false, error: 'Invalid or expired token', code: ErrorCodes.INVALID_TOKEN },
-          { status: 401 }
+        return addVersionHeaders(
+          NextResponse.json(
+            new ApiError(ErrorCodes.INVALID_TOKEN, getErrorMessage(ErrorCodes.INVALID_TOKEN), 401).toJSON(),
+            { status: 401 }
+          ),
+          version
         );
-        return addVersionHeaders(response, version);
       }
     }
 
@@ -148,11 +154,13 @@ export function createVersionedHandler(
       return addVersionHeaders(response, version);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Internal server error';
-      const response = NextResponse.json(
-        { success: false, error: message, code: ErrorCodes.INTERNAL_ERROR },
-        { status: 500 }
+      return addVersionHeaders(
+        NextResponse.json(
+          new ApiError(ErrorCodes.INTERNAL_ERROR, message, 500).toJSON(),
+          { status: 500 }
+        ),
+        version
       );
-      return addVersionHeaders(response, version);
     }
   };
 }
@@ -173,7 +181,7 @@ export function createValidatedHandler(
         body = sanitizeObject(await request.json());
       } catch {
         return NextResponse.json(
-          { success: false, error: 'Invalid JSON', code: ErrorCodes.INVALID_JSON },
+          new ApiError(ErrorCodes.INVALID_JSON, 'Invalid JSON', 400).toJSON(),
           { status: 400 }
         );
       }
@@ -181,12 +189,12 @@ export function createValidatedHandler(
       const validated = schema.safeParse(body);
       if (!validated.success) {
         return NextResponse.json(
-          {
-            success: false,
-            error: 'Validation failed',
-            code: ErrorCodes.VALIDATION_ERROR,
-            details: validated.error.errors.map(e => ({ path: e.path, message: e.message }))
-          },
+          new ApiError(
+            ErrorCodes.VALIDATION_ERROR,
+            'Validation failed',
+            400,
+            { details: validated.error.errors.map(e => ({ path: e.path, message: e.message })) }
+          ).toJSON(),
           { status: 400 }
         );
       }
