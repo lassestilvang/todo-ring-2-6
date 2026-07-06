@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,31 +10,32 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Calendar, Tag, Clock, Link, Bell, Share, MoreVertical, Trash2, Edit, Plus, AlertCircle } from 'lucide-react-native';
-import type { Task, Subtask } from '../types';
+import { Checkbox } from 'expo-checkbox';
+import {
+  Calendar,
+  Tag,
+  Clock,
+  Subtitles,
+  Link,
+  Bell,
+  Share,
+  MoreVertical,
+  Trash2,
+  Edit,
+  Plus,
+  AlertCircle,
+} from 'lucide-react-native';
+import { ENDPOINTS, getAuthHeaders } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { Task, Subtask, TaskDependency } from '../types/index';
 
-interface TaskDetailScreenProps {
-  route: {
-    params: { taskId: string };
-  };
-  navigation: {
-    goBack: () => void;
-  };
-}
-
-interface Dependency {
-  id: string;
-  title: string;
-}
-
-export default function TaskDetailScreen({ route, navigation }: TaskDetailScreenProps) {
+export default function TaskDetailScreen({ route, navigation }: any) {
   const { taskId } = route.params;
   const [task, setTask] = useState<Task | null>(null);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
-  const [dependencies, setDependencies] = useState<Dependency[]>([]);
+  const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
   const [loading, setLoading] = useState(true);
-  const API_BASE_URL = process.env.API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     fetchTask();
@@ -42,44 +43,55 @@ export default function TaskDetailScreen({ route, navigation }: TaskDetailScreen
     fetchDependencies();
   }, [taskId]);
 
-  const fetchTask = async (): Promise<void> => {
+  const fetchTask = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/v1/tasks?id=${taskId}`);
+      const token = await AsyncStorage.getItem('token');
+      const res = await fetch(`${ENDPOINTS.tasks}?id=${taskId}`, {
+        headers: getAuthHeaders(token || ''),
+      });
       const json = await res.json();
       if (json.success) setTask(json.data);
     } catch (error) {
-      console.error('Failed to fetch task:', error);
       Alert.alert('Error', 'Failed to fetch task');
     } finally {
       setLoading(false);
     }
-  };
+  }, [taskId]);
 
-  const fetchSubtasks = async (): Promise<void> => {
+  const fetchSubtasks = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/subtasks?taskId=${taskId}`);
+      const token = await AsyncStorage.getItem('token');
+      const res = await fetch(`${ENDPOINTS.subtasks}?taskId=${taskId}`, {
+        headers: getAuthHeaders(token || ''),
+      });
       const json = await res.json();
       if (json.success) setSubtasks(json.data);
     } catch (error) {
       console.error('Failed to fetch subtasks');
     }
-  };
+  }, [taskId]);
 
-  const fetchDependencies = async (): Promise<void> => {
+  const fetchDependencies = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/dependencies?taskId=${taskId}&view=blocking`);
+      const token = await AsyncStorage.getItem('token');
+      const res = await fetch(`${ENDPOINTS.dependencies}?taskId=${taskId}&view=blocking`, {
+        headers: getAuthHeaders(token || ''),
+      });
       const json = await res.json();
       if (json.success) setDependencies(json.data);
     } catch (error) {
       console.error('Failed to fetch dependencies');
     }
-  };
+  }, [taskId]);
 
-  const toggleSubtask = async (id: string, isCompleted: boolean): Promise<void> => {
+  const toggleSubtask = async (id: string, isCompleted: boolean) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/subtasks?id=${id}`, {
+      const token = await AsyncStorage.getItem('token');
+      const res = await fetch(`${ENDPOINTS.subtasks}?id=${id}`, {
         method: 'PUT',
+        headers: getAuthHeaders(token || ''),
+        body: JSON.stringify({ id, isCompleted: !isCompleted }),
       });
       if (res.ok) {
         setSubtasks(subtasks.map(s =>
@@ -91,12 +103,13 @@ export default function TaskDetailScreen({ route, navigation }: TaskDetailScreen
     }
   };
 
-  const addSubtask = async (): Promise<void> => {
+  const addSubtask = async () => {
     if (!newSubtask.trim()) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/subtasks`, {
+      const token = await AsyncStorage.getItem('token');
+      const res = await fetch(ENDPOINTS.subtasks, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(token || ''),
         body: JSON.stringify({ taskId, title: newSubtask }),
       });
       const json = await res.json();
@@ -109,7 +122,7 @@ export default function TaskDetailScreen({ route, navigation }: TaskDetailScreen
     }
   };
 
-  const deleteTask = async (): Promise<void> => {
+  const deleteTask = async () => {
     Alert.alert(
       'Delete Task',
       'Are you sure you want to delete this task?',
@@ -120,8 +133,10 @@ export default function TaskDetailScreen({ route, navigation }: TaskDetailScreen
           style: 'destructive',
           onPress: async () => {
             try {
-              await fetch(`${API_BASE_URL}/api/v1/tasks?id=${taskId}`, {
+              const token = await AsyncStorage.getItem('token');
+              await fetch(`${ENDPOINTS.tasks}?id=${taskId}`, {
                 method: 'DELETE',
+                headers: getAuthHeaders(token || ''),
               });
               navigation.goBack();
             } catch (error) {
@@ -160,7 +175,7 @@ export default function TaskDetailScreen({ route, navigation }: TaskDetailScreen
           <TextInput
             style={styles.title}
             value={task.title}
-            onChangeText={(text: string) => setTask({ ...task, title: text })}
+            onChangeText={(text) => setTask({ ...task, title: text })}
           />
           <View style={styles.actions}>
             <TouchableOpacity style={styles.action} onPress={deleteTask}>
@@ -183,7 +198,7 @@ export default function TaskDetailScreen({ route, navigation }: TaskDetailScreen
             <TextInput
               style={styles.description}
               value={task.description || ''}
-              onChangeText={(text: string) => setTask({ ...task, description: text })}
+              onChangeText={(text) => setTask({ ...task, description: text })}
               placeholder="Add description..."
               multiline
             />
@@ -212,9 +227,24 @@ export default function TaskDetailScreen({ route, navigation }: TaskDetailScreen
               {dependencies.map((dep, index) => (
                 <View key={index} style={styles.depItem}>
                   <AlertCircle size={16} color="#f59e0b" />
-                  <Text style={styles.depText}>{dep.title}</Text>
+                  <Text style={styles.depText}>{dep.title || 'Unknown task'}</Text>
                 </View>
               ))}
+            </View>
+          )}
+
+          {/* Recurring Task Info */}
+          {task.recurringType && task.recurringType !== 'none' && (
+            <View style={styles.section}>
+              <View style={styles.row}>
+                <Text style={styles.sectionTitle}>Recurring</Text>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{task.recurringType}</Text>
+                </View>
+              </View>
+              <Text style={styles.label}>
+                Next occurrence will be automatically created
+              </Text>
             </View>
           )}
 
@@ -233,12 +263,10 @@ export default function TaskDetailScreen({ route, navigation }: TaskDetailScreen
             </View>
             {subtasks.map((sub) => (
               <View key={sub.id} style={styles.subtaskItem}>
-                <TouchableOpacity
-                  style={[styles.checkbox, sub.isCompleted && styles.checkboxChecked]}
-                  onPress={() => toggleSubtask(sub.id, sub.isCompleted)}
-                >
-                  {sub.isCompleted && <Text style={styles.checkmark}>✓</Text>}
-                </TouchableOpacity>
+                <Checkbox
+                  value={sub.isCompleted}
+                  onValueChange={() => toggleSubtask(sub.id, sub.isCompleted)}
+                />
                 <Text
                   style={[
                     styles.subtaskText,
@@ -315,6 +343,18 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 12,
   },
+  badge: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   subtaskInput: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -342,22 +382,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingVertical: 6,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#3b82f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#3b82f6',
-  },
-  checkmark: {
-    color: 'white',
-    fontSize: 14,
   },
   subtaskText: {
     flex: 1,
