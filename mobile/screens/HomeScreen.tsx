@@ -4,16 +4,19 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TextInput,
-  TouchableOpacity,
-  RefreshControl,
   Alert,
+  RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { TaskItem } from '../components/TaskItem';
+import { AddTaskInput } from '../components/AddTaskInput';
+import { TaskDetailModal } from '../components/TaskDetailModal';
+import { BottomTabNavigator } from '../navigation/BottomTabNavigator';
+import { TasksContext } from '../context/TasksContext';
+import { ENDPOINTS, getAuthHeaders } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Task } from '../types';
-
-const API_BASE_URL = process.env.API_URL || 'http://localhost:3000';
+import type { Task } from '../types/index';
 
 export default function HomeScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -26,13 +29,12 @@ export default function HomeScreen() {
   const fetchTasks = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      const res = await fetch(`${API_BASE_URL}/api/v1/tasks?view=${filter}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${ENDPOINTS.tasks}?view=${filter}`, {
+        headers: getAuthHeaders(token || ''),
       });
       const json = await res.json();
       if (json.success) setTasks(json.data);
     } catch (error) {
-      console.error('Fetch tasks error:', error);
       Alert.alert('Error', 'Failed to fetch tasks');
     } finally {
       setLoading(false);
@@ -43,15 +45,12 @@ export default function HomeScreen() {
     fetchTasks();
   }, [filter, fetchTasks]);
 
-  const handleAddTask = async (title: string): Promise<void> => {
+  const handleAddTask = async (title: string) => {
     try {
       const token = await AsyncStorage.getItem('token');
-      const res = await fetch(`${API_BASE_URL}/api/v1/tasks`, {
+      const res = await fetch(ENDPOINTS.tasks, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(token || ''),
         body: JSON.stringify({ title }),
       });
       const json = await res.json();
@@ -59,21 +58,20 @@ export default function HomeScreen() {
         setTasks([json.data, ...tasks]);
       }
     } catch (error) {
-      console.error('Add task error:', error);
       Alert.alert('Error', 'Failed to add task');
     }
   };
 
-  const handleToggleTask = async (id: string): Promise<void> => {
+  const handleToggleTask = async (id: string) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
-
     const newStatus = task.status === 'completed' ? 'pending' : 'completed';
 
     try {
-      await fetch(`${API_BASE_URL}/api/v1/tasks`, {
+      const token = await AsyncStorage.getItem('token');
+      await fetch(ENDPOINTS.tasks, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(token || ''),
         body: JSON.stringify({ id, status: newStatus }),
       });
 
@@ -81,22 +79,24 @@ export default function HomeScreen() {
         t.id === id ? { ...t, status: newStatus } : t
       ));
     } catch (error) {
-      console.error('Toggle task error:', error);
       Alert.alert('Error', 'Failed to update task');
     }
   };
 
-  const handleDeleteTask = async (id: string): Promise<void> => {
+  const handleDeleteTask = async (id: string) => {
     try {
-      await fetch(`${API_BASE_URL}/api/v1/tasks?id=${id}`, { method: 'DELETE' });
+      const token = await AsyncStorage.getItem('token');
+      await fetch(`${ENDPOINTS.tasks}?id=${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token || ''),
+      });
       setTasks(tasks.filter(t => t.id !== id));
     } catch (error) {
-      console.error('Delete task error:', error);
       Alert.alert('Error', 'Failed to delete task');
     }
   };
 
-  const onRefresh = (): void => {
+  const onRefresh = () => {
     setRefreshing(true);
     fetchTasks().then(() => setRefreshing(false));
   };
@@ -107,15 +107,10 @@ export default function HomeScreen() {
         <Text style={styles.title}>TaskPlanner</Text>
       </View>
 
-      <TextInput
-        style={styles.addInput}
-        placeholder="Add a new task..."
-        placeholderTextColor="#6c757d"
-        onSubmitEditing={e => handleAddTask(e.nativeEvent.text)}
-      />
+      <AddTaskInput onAddTask={handleAddTask} />
 
       <View style={styles.filterContainer}>
-        {(['today', 'next7', 'all'] as const).map(f => (
+        {['today', 'next7', 'all'].map((f) => (
           <TouchableOpacity
             key={f}
             style={[
@@ -138,30 +133,17 @@ export default function HomeScreen() {
 
       <FlatList
         data={tasks}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.taskItem}>
-            <TouchableOpacity
-              style={styles.taskRow}
-              onPress={() => {
-                setSelectedTask(item);
-                setModalVisible(true);
-              }}
-            >
-              <TouchableOpacity
-                style={[styles.checkbox, item.status === 'completed' && styles.checkboxChecked]}
-                onPress={() => handleToggleTask(item.id)}
-              >
-                {item.status === 'completed' && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-              <Text style={[styles.taskTitle, item.status === 'completed' && styles.taskTitleCompleted]}>
-                {item.title}
-              </Text>
-              <TouchableOpacity onPress={() => handleDeleteTask(item.id)}>
-                <Text style={styles.deleteButton}>×</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </View>
+          <TaskItem
+            task={item}
+            onToggle={handleToggleTask}
+            onDelete={handleDeleteTask}
+            onPress={() => {
+              setSelectedTask(item);
+              setModalVisible(true);
+            }}
+          />
         )}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -174,6 +156,15 @@ export default function HomeScreen() {
             </Text>
           </View>
         }
+      />
+
+      <TaskDetailModal
+        task={selectedTask}
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onUpdate={(updatedTask) => {
+          setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
+        }}
       />
     </SafeAreaView>
   );
@@ -192,15 +183,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#1a1a1a',
-  },
-  addInput: {
-    height: 48,
-    backgroundColor: 'white',
-    marginHorizontal: 20,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -224,47 +206,6 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: 'white',
     fontWeight: '600',
-  },
-  taskItem: {
-    backgroundColor: 'white',
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 8,
-  },
-  taskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#3b82f6',
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#3b82f6',
-  },
-  checkmark: {
-    color: 'white',
-    fontSize: 16,
-  },
-  taskTitle: {
-    flex: 1,
-    fontSize: 16,
-  },
-  taskTitleCompleted: {
-    textDecorationLine: 'line-through',
-    color: '#6c757d',
-  },
-  deleteButton: {
-    fontSize: 24,
-    color: '#dc3545',
-    fontWeight: 'bold',
   },
   emptyContainer: {
     flex: 1,
