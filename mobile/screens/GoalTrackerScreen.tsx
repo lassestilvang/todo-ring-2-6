@@ -7,44 +7,36 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  ProgressBarAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Target, Plus, TrendingUp } from 'lucide-react-native';
-import type { Goal } from '../types';
+import { ENDPOINTS, getAuthHeaders } from '../config/api';
 
-interface GoalTrackerScreenProps {
-  route: { params?: { goalId?: string } };
-  navigation: {
-    navigate: (screen: string, params?: unknown) => void;
-  };
-}
-
-export default function GoalTrackerScreen({ route, navigation }: GoalTrackerScreenProps) {
-  const [goals, setGoals] = useState<Goal[]>([]);
+export default function GoalTrackerScreen({ route, navigation }) {
+  const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const API_BASE_URL = process.env.API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     fetchGoals();
   }, []);
 
-  const fetchGoals = async (): Promise<void> => {
+  const fetchGoals = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/v1/goals`);
+      const res = await fetch(ENDPOINTS.goals);
       const json = await res.json();
       if (json.success) {
         setGoals(json.data || []);
       }
     } catch (error) {
-      console.error('Fetch goals error:', error);
       Alert.alert('Error', 'Failed to fetch goals');
     } finally {
       setLoading(false);
     }
   };
 
-  const renderGoalCard = (goal: Goal) => {
+  const renderGoalCard = (goal) => {
     const progress = goal.targetValue > 0 ? (goal.currentValue / goal.targetValue) * 100 : 0;
     const isCompleted = goal.isCompleted || progress >= 100;
 
@@ -57,11 +49,9 @@ export default function GoalTrackerScreen({ route, navigation }: GoalTrackerScre
           <Text style={styles.goalTitle}>{goal.title}</Text>
         </View>
 
-        {goal.description && (
-          <Text style={styles.goalDescription} numberOfLines={2}>
-            {goal.description}
-          </Text>
-        )}
+        <Text style={styles.goalDescription} numberOfLines={2}>
+          {goal.description}
+        </Text>
 
         <View style={styles.progressContainer}>
           <View style={styles.progressHeader}>
@@ -105,10 +95,7 @@ export default function GoalTrackerScreen({ route, navigation }: GoalTrackerScre
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Goals</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => navigation.navigate('GoalTracker')}
-        >
+        <TouchableOpacity style={styles.addButton}>
           <Plus size={24} color="white" />
         </TouchableOpacity>
       </View>
