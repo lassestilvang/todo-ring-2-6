@@ -28,20 +28,31 @@ export function UserPresence({ taskId, listId, className }: UserPresenceProps) {
 
   return (
     <TooltipProvider>
-      <div className={cn('flex items-center gap-2', className)}>
+      <div
+        className={cn('flex items-center gap-2', className)}
+        role="region"
+        aria-label="Active users"
+        aria-live="polite"
+      >
         <div className="flex -space-x-2">
           {usersOnline.slice(0, 5).map((user, index) => (
             <Tooltip key={user.id || index}>
               <TooltipTrigger asChild>
                 <div className="relative">
-                  <Avatar className="w-8 h-8 border-2 border-background">
-                    <AvatarImage src={user.avatar || ''} alt={user.name} />
-                    <AvatarFallback>{user.name[0]}</AvatarFallback>
+                  <Avatar className="w-8 h-8 border-2 border-background" aria-hidden="true">
+                    <AvatarImage src={user.avatar || ''} alt="" />
+                    <AvatarFallback aria-label={user.name}>
+                      {user.name[0]}
+                    </AvatarFallback>
                   </Avatar>
-                  <div className={cn(
-                    'absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background',
-                    connected ? 'bg-green-500' : 'bg-amber-500'
-                  )} />
+                  <div
+                    className={cn(
+                      'absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background',
+                      connected ? 'bg-green-500' : 'bg-amber-500'
+                    )}
+                    role="status"
+                    aria-label={connected ? 'Online' : 'Connecting'}
+                  />
                 </div>
               </TooltipTrigger>
               <TooltipContent>{user.name}</TooltipContent>
@@ -49,17 +60,38 @@ export function UserPresence({ taskId, listId, className }: UserPresenceProps) {
           ))}
           {usersOnline.length > 5 && (
             <div className="w-8 h-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">
-              <span className="text-xs font-bold">+{usersOnline.length - 5}</span>
+              <span className="text-xs font-bold" aria-label={`And ${usersOnline.length - 5} more users`}>
+                +{usersOnline.length - 5}
+              </span>
             </div>
           )}
         </div>
         {usersOnline.length > 1 && (
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge variant="secondary" className="text-[10px]" aria-label={`${usersOnline.length} users online`}>
             {usersOnline.length} online
           </Badge>
         )}
       </div>
     </TooltipProvider>
+  );
+}
+
+export function UserPresenceIndicator({ userId }: { userId: string }) {
+  const { usersOnline } = useWebSocket({});
+
+  const user = usersOnline.find(u => u.id === userId);
+
+  if (!user) return null;
+
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className="w-2 h-2 rounded-full bg-green-500 animate-pulse"
+        role="status"
+        aria-label="Online"
+      />
+      <span className="text-xs text-muted-foreground" aria-hidden="true">Online</span>
+    </div>
   );
 }
 
