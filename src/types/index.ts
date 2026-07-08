@@ -496,3 +496,49 @@ export const RefreshTokenSchema = z.object({
 });
 
 export type RefreshToken = z.infer<typeof RefreshTokenSchema>;
+
+// === Token Info Schema ===
+export const TokenInfoSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  createdAt: z.string(),
+  expiresAt: z.string(),
+  expiresInMs: z.number(),
+  isExpired: z.boolean(),
+});
+
+export type TokenInfo = z.infer<typeof TokenInfoSchema>;
+
+// === Presence Update Schema ===
+export const PresenceUpdateSchema = z.object({
+  userId: z.string(),
+  userName: z.string(),
+  taskId: z.string().optional(),
+  status: z.enum(['online', 'offline', 'away', 'typing']),
+  cursor: z.object({
+    x: z.number(),
+    y: z.number(),
+  }).optional(),
+  timestamp: z.number(),
+});
+
+export type PresenceUpdate = z.infer<typeof PresenceUpdateSchema>;
+
+// === Task Version History Schema ===
+export const TaskVersionSchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  version: z.number(),
+  data: z.record(z.any()),
+  operation: z.object({
+    type: z.enum(['insert', 'update', 'delete', 'move']),
+    path: z.array(z.string()),
+    value: z.any().optional(),
+    position: z.number().optional(),
+  }),
+  performedBy: z.string(),
+  performedByName: z.string(),
+  timestamp: z.string(),
+});
+
+export type TaskVersion = z.infer<typeof TaskVersionSchema>;
