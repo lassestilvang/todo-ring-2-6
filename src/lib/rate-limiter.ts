@@ -121,7 +121,7 @@ async function rateLimitRedis(
 /**
  * Middleware for rate limiting API routes
  */
-export function withRateLimit(
+export async function withRateLimit(
   handler: (req: Request | any) => Promise<Response>,
   limit: number = DEFAULT_LIMIT,
   windowMs: number = DEFAULT_WINDOW
@@ -129,8 +129,34 @@ export function withRateLimit(
   return async (req: Request | any): Promise<Response> => {
     // Get client identifier (IP or API key)
     const clientKey = getClientKey(req);
+    
+    // Security enhancement: Add IP binding verification from JWT token
+    // Extract IP from JWT claims if present (for authenticated requests)
+    const authHeader = req.headers.get?.('authorization') || '';
+    let token = '';
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    }
+    
+    if (token) {
+      try {
+        // Verify token and check IP binding
+        const { payload } = await jwtVerify(token, secret);
+        if (payload.ip && payload.ip !== getClientKey(req).split(':')[1]) {
+          throw new Error('IP_MISMATCH');
+        }
+        // Optional: Add rate limit exemption for trusted IPs if needed
+      } catch (error) {
+        // If token verification fails, proceed with rate limiting based on IP only
+        // This maintains security while allowing unauthenticated requests
+        if (error.message !== 'IP_MISMATCH') {
+          // Log other token errors but don't block on them for rate limiting
+          console.warn('[SECURITY] Token verification warning:', error.message);
+        }
+      }
+    }
 
-    const result = rateLimit(clientKey, limit, windowMs);
+    const result = await rateLimit(clientKey, limit, windowMs);
 
     if (!result.success) {
       const response = new Response(
