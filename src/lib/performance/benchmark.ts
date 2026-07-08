@@ -142,6 +142,63 @@ export function getMemoryUsage(): {
 }
 
 /**
+ * CPU usage monitoring for Node.js environments
+ */
+export function getCpuUsage(): {
+  user: number;
+  system: number;
+  percentage: number;
+} {
+  if (typeof process !== 'undefined' && process.cpuUsage) {
+    const usage = process.cpuUsage();
+    const totalMs = (usage.user + usage.system) / 1000;
+    return {
+      user: usage.user / 1000,
+      system: usage.system / 1000,
+      percentage: (totalMs / 10000) * 100, // Percentage of 100ms period
+    };
+  }
+  return { user: 0, system: 0, percentage: 0 };
+}
+
+/**
+ * Monitor resource usage and log warnings
+ */
+export function monitorResources(): {
+  memory: ReturnType<typeof getMemoryUsage>;
+  cpu: ReturnType<typeof getCpuUsage>;
+  timestamp: number;
+} {
+  const memory = getMemoryUsage();
+  const cpu = getCpuUsage();
+
+  // Log warning if resources are high
+  if (memory.percentage > 80) {
+    console.warn(`High memory usage: ${memory.percentage.toFixed(1)}%`);
+  }
+  if (cpu.percentage > 80) {
+    console.warn(`High CPU usage: ${cpu.percentage.toFixed(1)}%`);
+  }
+
+  return { memory, cpu, timestamp: Date.now() };
+}
+
+/**
+ * Performance dashboard data collector
+ */
+export function collectDashboardMetrics(): any {
+  return {
+    memory: getMemoryUsage(),
+    cpu: getCpuUsage(),
+    cacheStats: {
+      size: typeof cache !== 'undefined' ? (cache as any).size : 0,
+      keys: typeof globalCacheRegistry !== 'undefined' ? (globalCacheRegistry as any).size : 0,
+    },
+    timestamp: Date.now(),
+  };
+}
+
+/**
  * Performance marks for detailed timing
  */
 export class PerformanceMarks {
