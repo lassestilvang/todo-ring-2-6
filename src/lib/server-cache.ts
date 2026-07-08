@@ -22,15 +22,19 @@ const globalCacheRegistry = new Set<string>();
 // In-memory cache
 const cache = new Map<string, CacheEntry<any>>();
 
-// Try to use Redis if available
+// Try to use Redis if available - now with BullMQ queue integration
 let redis: any = null;
 let redisConnected = false;
+
+// Task-specific Redis client for background sync conflict resolution
+let taskSyncRedis: any = null;
 
 // Only attempt Redis connection on server-side with REDIS_URL configured
 if (typeof window === 'undefined' && process.env.REDIS_URL) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const redisClient = require('redis');
+    // Main cache client
     redis = redisClient.createClient({ url: process.env.REDIS_URL });
     redis.on('error', () => {
       console.warn('Redis connection failed, falling back to memory cache');
@@ -45,9 +49,114 @@ if (typeof window === 'undefined' && process.env.REDIS_URL) {
       redis = null;
       redisConnected = false;
     });
+
+    // Task sync Redis client for conflict resolution
+    taskSyncRedis = redisClient.createClient({
+      url: process.env.REDIS_URL,
+      socket: {
+        reconnectStrategy: (retries: number) => Math.min(retries * 50, 5000)
+      }
+    });
+    taskSyncRedis.on('error', (error: Error) => {
+      console.warn('Task sync Redis error:', error.message);
+    });
   } catch {
     // Redis not available, use memory cache
     // Install 'redis' package for production Redis support
+  }
+}
+
+/**
+ * Task synchronization conflict resolver
+ * Uses Redis for distributed locking during concurrent operations
+ */
+export class TaskSyncConflictResolver {
+  private redisClient: any;
+
+  constructor() {
+    this.redisClient = taskSyncRedis;
+  }
+
+  /**
+   * Acquire a lock for task modification
+   * Prevents concurrent edits on the same task
+   */
+  async acquireLock(taskId: string, userId: string, timeoutMs: number = 5000): Promise<boolean> {
+    if (!this.redisClient || !redisConnected) {
+      // No Redis, allow operation (optimistic locking)
+      return true;
+    }
+
+    try {
+      const lockKey = `task_lock:${taskId}`;
+      const lockValue = `${userId}:${Date.now()}`;
+      const acquired = await this.redisClient.set(lockKey, lockValue, {
+        NX: true,
+        PX: timeoutMs
+      });
+      return acquired === 'OK';
+    } catch (error) {
+      console.error('Failed to acquire task lock:', error);
+      return true; // Allow operation on error
+    }
+  }
+
+  /**
+   * Release task lock
+   */
+  async releaseLock(taskId: string, userId: string): Promise<void> {
+    if (!this.redisClient || !redisConnected) return;
+
+    try {
+      const lockKey = `task_lock:${taskId}`;
+      const lockValue = await this.redisClient.get(lockKey);
+      if (lockValue && lockValue.startsWith(`${userId}:`)) {
+        await this.redisClient.del(lockKey);
+      }
+    } catch (error) {
+      console.error('Failed to release task lock:', error);
+    }
+  }
+
+  /**
+   * Get task version from cache to detect conflicts
+   */
+  async getVersion(taskId: string): Promise<number> {
+    if (!this.redisClient || !redisConnected) return 0;
+
+    try {
+      const version = await this.redisClient.get(`task_version:${taskId}`);
+      return version ? parseInt(version, 10) : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Increment task version atomically
+   */
+  async incrementVersion(taskId: string): Promise<number> {
+    if (!this.redisClient || !redisConnected) return 1;
+
+    try {
+      return (await this.redisClient.incr(`task_version:${taskId}`)) as number;
+    } catch {
+      return 1;
+    }
+  }
+
+  /**
+   * Check if operation conflicts with pending operations
+   */
+  async hasPendingOps(taskId: string, clientVersion: number): Promise<boolean> {
+    if (!this.redisClient || !redisConnected) return false;
+
+    try {
+      const pendingCount = await this.redisClient.lLen(`task_pending_ops:${taskId}`);
+      return (pendingCount || 0) > 0 && (await this.getVersion(taskId)) !== clientVersion;
+    } catch {
+      return false;
+    }
   }
 }
 
