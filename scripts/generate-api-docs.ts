@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Generate OpenAPI/Swagger documentation from JSDoc comments
- *
- * Usage: npx tsx scripts/generate-api-docs.ts
+ * Generate OpenAPI/Swagger documentation for TaskPlanner API
+ * Updated to include v2 endpoints and AI features
  */
 
 import fs from 'fs';
@@ -11,7 +10,6 @@ import path from 'path';
 import { execSync } from 'child_process';
 
 const OUTPUT_DIR = './docs/api';
-const DOCS_URL = 'https://taskplanner.github.io/docs';
 
 interface ApiEndpoint {
   path: string;
@@ -27,43 +25,61 @@ interface ApiEndpoint {
 }
 
 const endpoints: ApiEndpoint[] = [
+  // v2 Endpoints
   {
-    path: '/api/tasks',
+    path: '/api/v2/tasks',
     method: 'GET',
-    description: 'Retrieve all tasks for the authenticated user',
-    responses: {
-      '200': { description: 'Array of task objects' }
-    }
+    description: 'Retrieve all tasks with filtering options (AI-powered prioritization)',
+    parameters: [
+      { name: 'sortBy', in: 'query', required: false, schema: { type: 'string' } },
+      { name: 'limit', in: 'query', required: false, schema: { type: 'integer' } }
+    ],
+    responses: { '200': { description: 'Array of prioritized task objects' } }
   },
   {
-    path: '/api/tasks',
+    path: '/api/v2/tasks/batch',
     method: 'POST',
-    description: 'Create a new task',
-    parameters: [
-      {
-        name: 'body',
-        in: 'body',
-        required: true,
-        schema: { type: 'object' }
-      }
-    ],
-    responses: {
-      '201': { description: 'Created task object' }
-    }
+    description: 'Create or update multiple tasks in bulk',
+    responses: { '201': { description: 'Created/updated tasks' } }
+  },
+  {
+    path: '/api/v2/tasks/{id}/prioritize',
+    method: 'POST',
+    description: 'Get AI-powered task prioritization recommendation',
+    responses: { '200': { description: 'Priority analysis with recommendations' } }
+  },
+  {
+    path: '/api/v2/team/workload',
+    method: 'GET',
+    description: 'Get team workload analytics and capacity planning',
+    responses: { '200': { description: 'Workload distribution metrics' } }
+  },
+  {
+    path: '/api/v2/templates/marketplace',
+    method: 'GET',
+    description: 'Browse available task templates in marketplace',
+    responses: { '200': { description: 'Template catalog' } }
+  },
+  {
+    path: '/api/v2/goals/{id}/breakdown',
+    method: 'POST',
+    description: 'AI-powered goal-to-task breakdown',
+    responses: { '200': { description: 'Generated task breakdown' } }
   }
 ];
 
 function generateOpenApiSpec() {
   return {
-    openapi: '3.0.0',
+    openapi: '3.1.0',
     info: {
       title: 'TaskPlanner API',
-      version: '1.0.0',
-      description: 'API for TaskPlanner - A full-featured task management application'
+      version: '2.0.0',
+      description: 'API for TaskPlanner - A full-featured task management application with AI capabilities'
     },
     servers: [
-      { url: 'https://api.taskplanner.app', description: 'Production server' },
-      { url: 'http://localhost:3000', description: 'Local development server' }
+      { url: 'https://api.taskplanner.app/api/v2', description: 'Production server (v2)' },
+      { url: 'https://api.taskplanner.app/api/v1', description: 'Production server (v1)' },
+      { url: 'http://localhost:3000/api/v2', description: 'Local development server' }
     ],
     paths: endpoints.reduce((acc, endpoint) => {
       if (!acc[endpoint.path]) {
@@ -80,19 +96,16 @@ function generateOpenApiSpec() {
 }
 
 function main() {
-  // Ensure output directory exists
   if (!fs.existsSync(OUTPUT_DIR)) {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   }
 
-  // Generate OpenAPI spec
   const spec = generateOpenApiSpec();
   const specPath = path.join(OUTPUT_DIR, 'openapi.json');
   fs.writeFileSync(specPath, JSON.stringify(spec, null, 2));
   console.log(`✅ OpenAPI spec written to ${specPath}`);
 
-  // Generate HTML docs using Swagger UI
-  const htmlContent = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html>
 <head>
   <title>TaskPlanner API Docs</title>
@@ -113,10 +126,9 @@ function main() {
 </body>
 </html>`;
 
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'index.html'), htmlContent);
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'index.html'), html);
   console.log(`✅ HTML docs written to ${OUTPUT_DIR}/index.html`);
 
-  // Deploy to GitHub Pages (if in CI environment)
   if (process.env.GITHUB_ACTIONS) {
     execSync('gh-pages -d docs/api', { stdio: 'inherit' });
     console.log('✅ Docs deployed to GitHub Pages');
