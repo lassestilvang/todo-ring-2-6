@@ -14,18 +14,41 @@ export interface JwtPayload {
   name?: string;
   iat?: number;
   exp?: number;
+  iss?: string;
+  aud?: string;
+  ip?: string;
 }
 
 /**
- * Generate a JWT token
+ * Validate JWT configuration
  */
-export async function generateJwt(payload: Record<string, unknown>, expiresIn: string = '7d'): Promise<string> {
-  const token = await new SignJWT(payload)
+export function validateJwtConfig(): void {
+  if (!process.env.JWT_SECRET && !process.env.AUTH_SECRET) {
+    console.warn('[SECURITY] JWT_SECRET not configured - using insecure fallback');
+  }
+  if (process.env.NODE_ENV === 'production' && JWT_SECRET.includes('change')) {
+    throw new Error('JWT_SECRET must be changed in production');
+  }
+}
+
+/**
+ * Generate a JWT token with host binding verification
+ */
+export async function generateJwt(
+  payload: Record<string, unknown>,
+  expiresIn: string = '30m',
+  options?: { issuer?: string; audience?: string; bindIp?: string }
+): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  
+  return await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
+    .setIssuedAt(now)
     .setExpirationTime(expiresIn)
+    .setIssuer(options?.issuer || process.env.NODE_ENV || 'api.taskplanner.io')
+    .setAudience(options?.audience || process.env.ALLOWED_ORIGIN || 'taskplanner-app')
+    .set('ip', options?.bindIp)
     .sign(secret);
-  return token;
 }
 
 /**
