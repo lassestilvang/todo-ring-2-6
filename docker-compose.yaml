@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=${PORT:-3000}
+      - DATABASE_URL=postgres://postgres:secureservicepassword@db:5432/taskplanner?sslmode=verify-full
+      - JWT_SECRET=${JWT_SECRET}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./tmp:/tmp
+      - ./apps:/next
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - taskplanner-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL database service
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: taskplanner
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGTZ: UTC
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - taskplanner-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres --quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    command: postgres:run --max_connections=200 --shared_buffers=128MB
+
+  # Redis service
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --maxmemory 256MB --maxmemory-policy allkeys-lru --save 60 10000
+    networks:
+      - taskplanner-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # Background worker
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.dockerfile
+    restart: unless-stopped
+    environment:
+      - QUEUE_CONNECTION=redis://redis:6379
+      - JOB_PROCESSOR=true
+    depends_on:
+      - redis
+      - db
+    networks:
+      - taskplanner-network
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:v2.44.0
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./docker/prometheus:/etc/prometheus
+    networks:
+      - taskplanner-network
+    command:
+      prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/prometheus
+        --storage.tsdb.retention.time=15d
+
+  # Grafana for monitoring
+  grafana:
+    image: grafana/grafana:10.4.1
+    restart: unless-stopped
+    ports:
+      - "${GF_PORT:-3000}:3000"
+    environment:
+      - GF_SECURE_ADMIN_PASSWORD={admin-password}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - taskplanner-network
+    depends_on:
+      - prometheus
+
+  # Sentry for error monitoring
+  sentry:
+    image: sentry:16.7.0
+    restart: unless-stopped
+    volumes:
+      - ./docker/sentry:/etc/sentry
+    networks:
+      - taskplanner-network
+    environment:
+      - SENTRY_WORKSPACES=auto
+      - SENTRY_LOG_LEVEL=debug
+    command: sentry worker --config-file /etc/sentry/config.json
+
+networks:
+  taskplanner-network:
+    driver: bridge
+    ipam:
+      driver: default
+      options:
+        com.docker.network.bridge.enable-ip-mangle-tables: "false"
+
+volumes:
+  postgres-data:
+    driver: local
+  grafana-data:
+    driver: local
+  tmp:
+    driver: local
+    driver_opts:
+      type: none
+      device: "/Users/lasse/Sites/todo-ring-2-6/dev.env"
+      o: bind
+      o: mount=/tmp/env
