@@ -1,18 +1,49 @@
-// @ts-nocheck
-const withSentryConfig = require('@sentry/nextjs').withSentryConfig;
+// @ts-check
+import type { NextConfig } from 'next';
+import { withSentryConfig } from '@sentry/nextjs';
 
-const sentryWebpackPluginOptions = {
+const withSentry = withSentryConfig({
   silent: true,
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
+});
+
+const securityHeaders = {
+  headers: [
+    {
+      key: 'Cache-Control',
+      value: 'no-store', // Because Next.js sends caching headers by default
+    },
+    {
+      key: 'X-Frame-Options',
+      value: 'DENY',
+    },
+    {
+      key: 'X-Content-Type-Options',
+      value: 'nosniff',
+    },
+    {
+      key: 'Referrer-Policy',
+      value: 'strict-origin-when-cross-origin',
+    },
+    {
+      key: 'Permissions-Policy',
+      value: 'geolocation=(), microphone=(), camera=(), fullscreen=(self)',
+    },
+    {
+      key: 'Strict-Transport-Security',
+      value: 'max-age=31536000; includeSubDomains',
+    },
+  ],
 };
 
-const nextConfig: NextConfig = {
+const config: NextConfig = {
   serverExternalPackages: ['better-sqlite3'],
   experimental: {
     dynamicImport: true,
     optimizeCss: true,
+    serverActions: true,
   },
   images: {
     unoptimized: false,
@@ -34,7 +65,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // PWA Configuration
   webpack: (config, { dev }) => {
     if (process.env.ANALYZE === 'true') {
       const BundleAnalyzerPlugin = require('@next/bundle-analyzer')({
@@ -44,17 +74,17 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
-  // Offline support configuration
   trailingSlash: true,
   reactStrictMode: true,
+  ...securityHeaders,
 };
 
-export default withSentryConfig(nextConfig, sentryWebpackPluginOptions);
-
+export default withSentry;
 export const config = {
-  // Experimental features can be enabled here
-  experimental: {
-    serverComponents: true,
-    serverActions: true,
+  experimental,
+  serverActions: {
+    authorization: {
+      enabled: true, // Enable server actions authorization
+    },
   },
 };
