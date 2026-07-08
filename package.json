@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "mutation-test": "cbest run",
+    "mutation-test:report": "cbest run --reporter=html",
+    "mutation-test:watch": "cbest watch",
     "benchmark": "tsx scripts/benchmark.ts",
     "benchmark:api": "tsx scripts/benchmark-api.ts",
     "docs": "swagger-ui-express ./openapi.yaml",
@@ -84,6 +87,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@sentry/nextjs": "^10.59.0",
     "@storybook/addon-a11y": "^8.0.0",
     "@storybook/addon-interactions": "^8.0.0",
     "@storybook/addon-essentials": "^8.0.0",
@@ -111,6 +115,7 @@
     "@vitest/coverage-v8": "4.1.9",
     "autoprefixer": "^10.5.0",
     "axe-core": "^4.12.1",
+    "cbest": "^1.0.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.0.0",
     "fast-check": "^4.8.0",
