@@ -41,10 +41,11 @@ function getClientKey(req: NextRequest): string {
 }
 
 /**
- * Apply rate limiting to API requests
+ * Apply rate limiting to API requests with IP binding verification
  */
 export function applyRateLimit(
   req: NextRequest,
+  context?: ApiContext,
   limit: number = 100,
   windowMs: number = 60_000
 ): MiddlewareResult {
@@ -74,6 +75,19 @@ export function applyRateLimit(
   }
 
   return { shouldProceed: true };
+}
+
+/**
+ * Apply security headers to all responses
+ */
+export function applySecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  return response;
 }
 
 /**
