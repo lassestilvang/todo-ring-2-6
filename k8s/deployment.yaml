@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: taskplanner-config
+data:
+  NODE_ENV: production
+  PORT: "3000"
+  DATABASE_URL: ./db.sqlite
+  NEXT_PUBLIC_API_VERSION: "v2"
+  SECURITY_HEADERS_ENABLED: "true"
+  CONTENT_SECURITY_POLICY: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' wss: https:;"
+  FEATURE_TEAM_WORKLOAD: "true"
+  FEATURE_AI_TASK_SUGGESTIONS: "true"
+  FEATURE_TEMPLATE_MARKETPLACE: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: taskplanner-secrets
+type: Opaque
+stringData:
+  JWT_SECRET: change-me-in-production
+  AUTH_SECRET: change-me-in-production
+  DATABASE_URL: postgres://taskplanner:password@postgres-service:5432/taskplanner
+  OPENAI_API_KEY: your-openai-key-here
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taskplanner-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: taskplanner
+  template:
+    metadata:
+      labels:
+        app: taskplanner
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      containers:
+      - name: taskplanner
+        image: ghcr.io/username/taskplanner:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: taskplanner-config
+        - secretRef:
+            name: taskplanner-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health/healthcheck
+            port: 3000
+          initialDelaySeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/health/readiness
+            port: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: taskplanner-service
+spec:
+  selector:
+    app: taskplanner
+  ports:
+  - port: 80
+    targetPort: 3000
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: taskplanner-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - taskplanner.example.com
+    secretName: taskplanner-tls
+  rules:
+  - host: taskplanner.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: taskplanner-service
+            port:
+              number: 80
