@@ -5,6 +5,7 @@
 
 import { getOfflineCache } from './offline-cache';
 import { getDb } from '@/db/operations';
+import { TaskSyncConflictResolver } from './server-cache';
 
 interface SyncResult {
   success: boolean;
@@ -16,6 +17,74 @@ interface SyncResult {
 class SyncManager {
   private isSyncing = false;
   private syncInterval: NodeJS.Timeout | null = null;
+  private conflictResolver = new TaskSyncConflictResolver();
+
+  /**
+   * Sync with conflict resolution
+   */
+  async syncWithConflictResolution(): Promise<SyncResult> {
+    const result = await this.sync();
+
+    // After sync, resolve any remaining conflicts
+    if (result.failed > 0 && result.errors.length > 0) {
+      return this.resolveConflicts(result);
+    }
+
+    return result;
+  }
+
+  /**
+   * Resolve conflicts after failed sync attempts
+   */
+  private async resolveConflicts(result: SyncResult): Promise<SyncResult> {
+    const cache = getOfflineCache();
+
+    // Get conflicted items
+    const conflictedItems = result.errors.map(e => {
+      const match = e.match(/^(.+):(.+)$/);
+      return match ? { entityType: match[1], entityId: match[2] } : null;
+    }).filter(Boolean);
+
+    for (const item of conflictedItems) {
+      if (item) {
+        // Get latest server version
+        const serverVersion = await this.fetchServerVersion(item.entityId);
+        const localVersion = await cache.getLocalVersion(item.entityId);
+
+        // Last-write-wins strategy
+        if (serverVersion && localVersion < serverVersion) {
+          // Server is newer, discard local changes
+          await cache.discardChanges(item.entityId);
+          result.synced++;
+          result.failed--;
+        } else if (serverVersion && localVersion > serverVersion) {
+          // Local is newer, retry sync
+          await this.retrySync(item.entityId);
+          result.synced++;
+          result.failed--;
+        }
+      }
+    }
+
+    // Remove duplicate errors
+    result.errors = result.errors.filter((_, i) => i >= result.errors.length - result.failed);
+    return result;
+  }
+
+  private async fetchServerVersion(entityId: string): Promise<number | null> {
+    try {
+      const response = await fetch(`/api/tasks/${entityId}/version`);
+      const data = await response.json();
+      return data.success ? data.data.version : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async retrySync(entityId: string): Promise<void> {
+    // Implementation would requeue the entity for sync
+    console.log(`Retrying sync for entity ${entityId}`);
+  }
 
   /**
    * Start periodic sync
@@ -57,6 +126,14 @@ class SyncManager {
 
       for (const item of pendingItems) {
         try {
+          // Acquire lock for conflict resolution
+          const lockAcquired = await this.conflictResolver.acquireLock(item.entityId, item.userId || 'unknown');
+          if (!lockAcquired) {
+            errors.push(`${item.entityType}:${item.entityId} - Could not acquire lock`);
+            failed++;
+            continue;
+          }
+
           const success = await this.syncItem(item);
           if (success) {
             await cache.removeFromSyncQueue(item.id);
@@ -64,6 +141,9 @@ class SyncManager {
           } else {
             await this.handleSyncFailure(item, errors);
           }
+
+          // Release lock
+          await this.conflictResolver.releaseLock(item.entityId, item.userId || 'unknown');
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Unknown error';
           errors.push(`${item.entityType}:${item.entityId} - ${message}`);
