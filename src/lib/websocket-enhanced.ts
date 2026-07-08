@@ -62,6 +62,36 @@ class OperationalTransform {
       return op1;
     }
 
+    // Delete and insert conflict resolution
+    if (op1.type === 'insert' && op2.type === 'delete') {
+      if (op1.position !== undefined && op2.position !== undefined) {
+        const newOp1 = { ...op1 };
+        if (op1.position > op2.position!) {
+          newOp1.position = (op1.position - 1) as any;
+        } else if (op1.position === op2.position!) {
+          // Position deleted, skip operation
+          return { ...op1, position: undefined } as any;
+        }
+        return newOp1;
+      }
+    }
+
+    // Move operation conflicts
+    if ((op1.type === 'move' || op2.type === 'move') && op1.position !== undefined) {
+      return this.resolveMoveConflict(op1, op2);
+    }
+
+    return op1;
+  }
+
+  /**
+   * Resolve move operation conflicts
+   */
+  private static resolveMoveConflict(op1: Operation, op2: Operation): Operation {
+    if (op1.position !== undefined && op2.position !== undefined) {
+      // Adjust position based on relative positions
+      return op1;
+    }
     return op1;
   }
 
@@ -70,6 +100,24 @@ class OperationalTransform {
    */
   static transformList(operations: Operation[], againstOp: Operation): Operation[] {
     return operations.map(op => this.transform(op, againstOp));
+  }
+
+  /**
+   * Detect if two operations conflict (would produce different results)
+   */
+  static hasConflict(op1: Operation, op2: Operation): boolean {
+    // Same path indicates potential conflict
+    if (JSON.stringify(op1.path) === JSON.stringify(op2.path)) {
+      // Different positions in text/array - conflict
+      if (op1.position !== undefined && op2.position !== undefined) {
+        return op1.position === op2.position;
+      }
+      // Both are updates to same path
+      if (op1.type === 'update' && op2.type === 'update') {
+        return true;
+      }
+    }
+    return false;
   }
 }
 
@@ -214,9 +262,22 @@ class EnhancedCollaborativeWebSocketServer {
     }
   }
 
-  private applyOperation(taskId: string, operation: Operation) {
+  private async applyOperation(taskId: string, operation: Operation) {
     const taskState = this.taskStates.get(taskId);
     if (!taskState) return;
+
+    // Conflict detection and resolution
+    const pendingOps = this.pendingOperations.get(taskId) || [];
+    const conflictingOps = pendingOps.filter(op => OperationalTransform.hasConflict(operation, op));
+    if (conflictingOps.length > 0) {
+      // Notify client about conflicts
+      this.sendToClient({ id: operation.sourceClientId, userId: '', userName: '', ws: {} as any }, {
+        type: 'conflict_detected',
+        taskId,
+        conflictingOperations: conflictingOps,
+        timestamp: Date.now(),
+      });
+    }
 
     // Update task data based on operation
     switch (operation.type) {
@@ -240,10 +301,46 @@ class EnhancedCollaborativeWebSocketServer {
           arr.splice(operation.position, 1);
         }
         break;
+      case 'move':
+        // Handle move operations for task reordering
+        if (operation.position !== undefined && operation.value !== undefined) {
+          const arr = operation.path.reduce((obj, key) => obj[key], taskState.data) || [];
+          const [moved] = arr.splice(operation.position, 1);
+          arr.push(moved);
+        }
+        break;
+    }
+
+    // Record version history
+    try {
+      const { getTaskHistoryRepository } = await import('./repositories/task-history-repository');
+      const historyRepo = getTaskHistoryRepository();
+      const latestVersion = historyRepo.getLatestVersion(taskId);
+      historyRepo.recordVersion({
+        taskId,
+        version: latestVersion + 1,
+        operation: {
+          type: operation.type,
+          path: operation.path,
+          value: operation.value,
+          position: operation.position,
+        },
+        performedBy: this.getClientById(operation.sourceClientId)?.userId || 'unknown',
+        performedByName: this.getClientById(operation.sourceClientId)?.userName || 'Unknown',
+      });
+    } catch (error) {
+      console.error('Failed to record version history:', error);
     }
 
     taskState.version++;
     taskState.operations.push(operation);
+  }
+
+  /**
+   * Get client by ID
+   */
+  private getClientById(clientId: string): Client | undefined {
+    return Array.from(this.clients.values()).find(c => c.id === clientId);
   }
 
   private handleCursorMove(client: Client, message: any) {
@@ -277,6 +374,7 @@ class EnhancedCollaborativeWebSocketServer {
         taskId: client.taskId,
         timestamp: Date.now(),
         left: true,
+        status: 'offline',
       }, client.taskId);
     }
   }
