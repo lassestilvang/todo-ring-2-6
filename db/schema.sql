@@ -702,3 +702,21 @@ CREATE TABLE IF NOT EXISTS focus_time_budgets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_focus_budgets_user ON focus_time_budgets(user_id);
+
+-- Task Versions table for OT history tracking
+CREATE TABLE IF NOT EXISTS task_versions (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL,
+  operation_type TEXT NOT NULL CHECK(operation_type IN ('insert', 'update', 'delete', 'move')),
+  operation_path TEXT NOT NULL, -- JSON array path
+  operation_value TEXT, -- JSON value
+  operation_position INTEGER, -- For list operations
+  performed_by TEXT NOT NULL,
+  performed_by_name TEXT NOT NULL,
+  timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_versions_task ON task_versions(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_versions_version ON task_versions(task_id, version);
+CREATE INDEX IF NOT EXISTS idx_task_versions_performed ON task_versions(performed_by);
