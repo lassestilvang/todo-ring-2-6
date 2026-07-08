@@ -1,0 +1,82 @@
+{
+  "dashboard": {
+    "title": "TaskPlanner - Infrastructure Metrics",
+    "uid": "taskplanner-infra",
+    "timezone": "browser",
+    "schemaVersion": 36,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "title": "CPU Usage per Pod",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{pod=~\"taskplanner.*\"}[5m])",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "title": "Memory Usage per Pod",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{pod=~\"taskplanner.*\"} / 1024 / 1024",
+            "legendFormat": "{{pod}} MB"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "title": "Network I/O",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(container_network_receive_bytes_total{pod=~\"taskplanner.*\"}[5m])",
+            "legendFormat": "{{pod}} received"
+          },
+          {
+            "expr": "rate(container_network_transmit_bytes_total{pod=~\"taskplanner.*\"}[5m])",
+            "legendFormat": "{{pod}} transmitted"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}
+      },
+      {
+        "title": "Disk I/O",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(container_fs_writes_bytes_total{pod=~\"taskplanner.*\"}[5m])",
+            "legendFormat": "{{pod}} writes"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}
+      },
+      {
+        "title": "Pod Restarts",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "kube_pod_container_status_restarts_total{pod=~\"taskplanner.*\"}",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8}
+      },
+      {
+        "title": "Pending Pods",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "kube_pod_status_ready{condition=\"false\", pod=~\"taskplanner.*\"}",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8}
+      }
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'taskplanner'
+    static_configs:
+      - targets:
+        - localhost:3000
+
+  - job_name: 'kubernetes'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_container_image]
+        target_label: __image
+
+alerting:
+  rules:
+  - alert: HighErrorRate
+    expr: sum(rate(http_requests_total{status=~'(50[1-3]|404|429)')}[5m]) / sum(rate(http_requests_total[5m])) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: 'High error rate in TaskPlanner'
+      description: 'Error rate exceeds 5% in the last 5 minutes'
+  - alert: LongLatency
+    expr: rate(http_request_duration_seconds_bucket{le>2}[5m]) * 100 > 10
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: 'Slow HTTP requests'
+      description: '90th percentile latency exceeds 2s for 10 minutes'
