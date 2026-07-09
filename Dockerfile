@@ -1,81 +1,72 @@
-# Stage 0: Setup
+# Stage 1: Setup
 FROM node:20-alpine AS base
 
-# Security headers configuration
-# Generate proper secrets using environment variables
-ENV JWT_SECRET=your-super-secret-jwt-key-here \
-    AUTH_SECRET=your-auth-secret-here \
-    SMTP_USER=your-email@gmail.com \
-    SMTP_PASS=your-app-password \
-    VAPID_PUBLIC_KEY=your-vapid-public-key-here \
-    VAPID_PRIVATE_KEY=your-vapid-private-key-here \
-    VAPID_SUBJECT=mailto:your-contact@domain.com
+# Install tini (to handle zombie processes nicely)
+RUN apk add --no-cache tini
 
-# Base configuration for security
-RUN apk add --no-cache \
-    ca-certificates \
-    tzdata \
-    && update-ca-certificates
+# Run as non-root user for security
+ENV NODE_ENV=production
+ENV TZ=UTC
+ENV PORT=3000
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 appuser
-RUN adduser --system --uid 1001 --gid 1001 nextjs
+# Install bash and tini init
+RUN apk add --no-cache bash tini
 
-# Stage 1: Build
-FROM node:20-builder AS builder
+# Use tini as init system
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Stage 2: Build
+FROM node:20-alpine AS builder
+
+# Install dependencies with proper locking
+RUN apk add --no-cache python3 make g++ \
+    && cp /usr/share/zoneinfo/UTC /etc/localtime && echo "Asia/Shanghai" > /etc/localtime
 
 # Set working directory
 WORKDIR /app
 
-# Security hardening: Install only necessary packages
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    && cp /usr/share/zoneinfo/UTC /etc/localtime && echo "Asia/Taipei" > /etc/localtime
-
-# Copy package files with proper permissions
-COPY package.json package-lock.json ./
-RUN npm ci --only=production && npm cache clean --force
+# Install production dependencies first (faster caching)
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
-# Build application with production configuration
-RUN npm run build
+# Use Build with production environment
+ENV NODE_ENV=production
+RUN pnpm build
 
-# Production stage
+# Stage 3: Production
 FROM node:20-alpine AS runner
 
-# Working directory
+# Use non-root user for security
 WORKDIR /app
+RUN addgroup --system --gid 1001 appuser \
+    && adduser --system --uid 1001 --gid 1001 nextjs
 
-# Copy security configurations and built assets
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
+# Set environment variables
+ENV NODE_ENV=production \
+    PORT=3000 \
+    NODE_OPTIONS="--enable-cjs"
+
+# Copy necessary files
+COPY --from=builder /app/.next .next
+COPY --from=builder /app/public .next/../public
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 
-# Security hardenings for production
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/tmp ./tmp
-
-# Expose port with proper configuration
+# Expose port
 EXPOSE 3000
 
-# Set environment variables for production
-ENV NODE_ENV=production \
-    PORT=3000 \
-    EDGE_RUNTIME=false \
-    VERCEL_ENV=production
+# Set proper permissions
+RUN chown -R nextjs:appuser /app
 
-# Health check with proper security validation
+# Switch to non-root user
+USER nextjs
+
+# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget -q -O- http://localhost:3000/api/health/healthcheck || exit 1 || exit 1
+  CMD wget -q -O- http://localhost:3000/api/health || exit 1
 
-# Security headers configuration for Next.js
-# Configure security headers in next.config.ts during runtime
-COPY .env.example .env
-
-# Start application with production configuration
-CMD ["node", ".next/standalone/index.js"]
+# Start application
+CMD ["node", ".next/standalone/server.js"]
