@@ -1,113 +1,91 @@
 /**
- * Authentication utilities for TaskPlanner
- * Provides both client-side (localStorage) and server-side (JWT) auth
+ * Authentication utilities for API routes.
+ * Handles JWT token validation, expiration checking, and revocation.
  */
 
-import { randomUUID } from 'crypto';
+import { Request } from 'next/server';
+import admin from 'firebase-admin';
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-// ============= Client-side localStorage Auth =============
-
-/**
- * Generate a unique user ID (client-side)
- */
-export function generateUserId(): string {
-  return `user_${randomUUID().slice(0, 8)}`;
-}
-
-/**
- * Get current user from localStorage (client-side)
- */
-export function getClientUser(): User | null {
-  if (typeof window === 'undefined') return null;
-
-  const stored = localStorage.getItem('taskplanner-user');
-  if (!stored) return null;
-
+// Initialize Firebase admin SDK if not already initialized
+if (!admin.apps.length) {
   try {
-    return JSON.parse(stored) as User;
-  } catch {
-    return null;
+    admin.initializeApp({
+      credential: admin.credential.cert(
+        JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT as string)
+      ),
+    });
+  } catch (error) {
+    console.error('Failed to initialize Firebase admin SDK', error);
   }
 }
 
 /**
- * Set current user in localStorage (client-side)
+ * Validate a Firebase ID token and return its payload.
+ * Throws if token is invalid or expired.
  */
-export function setClientUser(user: User): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('taskplanner-user', JSON.stringify(user));
+export async function validateIdToken(token: string) {
+  if (!admin.apps.length) {
+    throw new Error('Firebase admin SDK not initialized');
+  }
+  return await admin.auth().verifyIdToken(token);
 }
 
 /**
- * Clear current user from localStorage (client-side)
+ * Extract user ID from a validated token payload.
  */
-export function clearClientUser(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('taskplanner-user');
+export function getUserIdFromPayload(payload: any): string {
+  return payload.uid;
 }
 
 /**
- * Create a guest user (client-side)
+ * Simple revocation store (in-memory for demo).
+ * In production, use Redis or database.
  */
-export function createGuestUser(): User {
-  const id = generateUserId();
-  const suffix = id.slice(-4);
-  const user: User = {
-    id,
-    name: `Guest ${suffix}`,
-    email: `guest${suffix}@taskplanner.local`,
-    createdAt: new Date().toISOString(),
-  };
-  setClientUser(user);
-  return user;
-}
-
-// ============= Server-side JWT Auth =============
-// These functions are only meant to be used in server-side code
-// See server-auth.ts for database operations
-
-const JWT_SECRET = process.env.AUTH_SECRET || process.env.JWT_SECRET || 'taskplanner-secret-key-change-in-production';
+const revokedTokens = new Set<string>();
 
 /**
- * Generate a JWT token for user (server-side)
+ * Mark token as revoked
+ * @param token Raw token or uid+authTime
  */
-export function generateToken(userId: string): string {
-  const { createHmac } = require('crypto');
-  const timestamp = Date.now().toString();
-  const data = `${userId}:${timestamp}`;
-  const signature = createHmac('sha256', JWT_SECRET).update(data).digest('hex');
-  return `${userId}.${timestamp}.${signature}`;
+export function revokeToken(token: string): void {
+  revokedTokens.add(token);
 }
 
 /**
- * Verify token and return user ID (server-side)
+ * Check if token is revoked
+ * @param token Raw token string
+ * @returns True if revoked
  */
-export function verifyToken(token: string): string | null {
+export function isTokenRevoked(token: string): boolean {
+  return revokedTokens.has(token);
+}
+
+/**
+ * JWT authentication middleware
+ * Returns 401 if token is missing/invalid/revoked
+ */
+export async function requireAuth(req: Request): Promise<any> {
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const token = authHeader.replace('Bearer ', '');
+
+  if (!token) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   try {
-    const { createHmac } = require('crypto');
-    const [userId, timestamp, signature] = token.split('.');
-    if (!userId || !timestamp || !signature) return null;
-
-    const data = `${userId}:${timestamp}`;
-    const expectedSignature = createHmac('sha256', JWT_SECRET).update(data).digest('hex');
-
-    if (signature !== expectedSignature) return null;
-
-    // Check if token is expired (7 days)
-    const tokenAge = Date.now() - parseInt(timestamp);
-    if (tokenAge > 7 * 24 * 60 * 60 * 1000) return null;
-
-    return userId;
-  } catch {
-    return null;
+    const payload = await validateIdToken(token);
+    // Check revocation
+    if (isTokenRevoked(token)) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+    // Check IP binding
+    const payloadIP = payload.ip || req.headers.get('x-forwarded-for') || 'unknown';
+    const requestIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+    if (payloadIP !== requestIP) {
+      return new Response('Unauthorized (IP mismatch)', { status: 401 });
+    }
+    return payload;
+  } catch (error) {
+    return new Response('Unauthorized', { status: 401 });
   }
 }
