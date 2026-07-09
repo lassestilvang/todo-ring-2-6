@@ -1,15 +1,24 @@
 /**
- * Standardized error codes for API responses
+ * Standardized security error codes for TaskPlanner
  *
  * Error codes follow a consistent naming pattern:
+ * - PREFIXED CONTROLS CATEGORY AND SEVERITY
  * - UPPER_SNAKE_CASE
- * - Grouped by category
  * - Used for logging, monitoring, and client-side error handling
+ *
+ * Security-focused categorization:
+ * - AUTH_*: Authentication-related
+ * - VAL_*: Validation-related
+ * - RES_*: Resource-related
+ * - CONFLICT_*: Conflict-detection
+ * - RATE_*: Rate-limiting
+ * - SERVER_*: Server errors
+ * - BUSINESS_*: Business logic issues
  *
  * @example
  * ```typescript
- * if (error.code === ErrorCodes.TASK_NOT_FOUND) {
- *   // Handle missing task
+ * if (error.code === ErrorCodes.AUTH_TOKEN_EXPIRED) {
+ *   // Handle expired token
  * }
  * ```
  */
