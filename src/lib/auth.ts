@@ -1,91 +1,111 @@
+import { Redis } from 'ioredis';
+import { v4 as uuidv4 } from 'uuid';
+
 /**
- * Authentication utilities for API routes.
- * Handles JWT token validation, expiration checking, and revocation.
+ * Secure token manager using Redis for persistence
  */
+class TokenManager {
+  private redis: Redis;
+  private readonly REVOKED_TTL = 30 * 60; // 30 minutes
+  private readonly ACTIVE_TTL = 15 * 60;  // 15 minutes
 
-import { Request } from 'next/server';
-import admin from 'firebase-admin';
+  constructor() {
+    this.redis = new Redis({
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: parseInt(process.env.REDIS_PORT) || 6379,
+      password: process.env.REDIS_PASSWORD,
+    });
+  }
 
-// Initialize Firebase admin SDK if not already initialized
-if (!admin.apps.length) {
+  /**
+   * Generate new token pair and store in Redis
+   * @param userId - Associated user ID
+   * @returns {Promise<{accessToken: string, refreshToken: string}>}
+   */
+  async generateTokens(userId: string): Promise<{ accessToken: string, refreshToken: string }> {
+    // Generate unique tokens
+    const refreshToken = uuidv4();
+    const accessToken = uuidv4();
+
+    // Store in Redis with proper TTL
+    const pipe = this.redis.pipeline();
+    pipe.zadd(`tokens:${userId}`, Date.now(), refreshToken);
+    pipe.zadd(`active:tokens`, Date.now(), refreshToken);
+    pipe.expire(`tokens:${userId}`, this.ACTIVE_TTL);
+    pipe.expire(`active:tokens`, this.ACTIVE_TTL);
+    await pipe.exec();
+
+    return { accessToken, refreshToken };
+  }
+
+  /**
+   * Revoke a specific token
+   * @param token - Token to revoke
+   * @returns {Promise<boolean>} - Whether revocation was successful
+   */
+  async revokeToken(token: string): Promise<boolean> {
+    // Remove from active tokens
+    const removedFromActive = await this.redis.zrem(`active:tokens`, token);
+
+    // Add to revoked tokens set with TTL
+    await this.redis.zadd(`revoked:tokens`, Date.now() + this.REVOKED_TTL, token);
+    await this.redis.expire(`revoked:tokens`, this.REVOKED_TTL);
+
+    return removedFromActive > 0;
+  }
+
+  /**
+   * Check if a token has been revoked
+   * @param token - Token to check
+   * @returns {Promise<boolean>}
+   */
+  async isTokenRevoked(token: string): Promise<boolean> {
+    const revokedMembers = await this.redis.zrange(`revoked:tokens`, 0, -1);
+    return revokedMembers.includes(token);
+  }
+
+  /**
+   * Remove all tokens for a user (used in revocation endpoint)
+   */
+  private async revokeAllTokens(userId: string): Promise<number> {
+    const activeKeys = await this.redis.keys(`tokens:${userId}.*`);
+    const count = await this.redis.del(...activeKeys);
+    return count;
+  }
+}
+
+/**
+ * Secure token revocation endpoint
+ * POST /api/v1/auth/revoke-token
+ */
+export async function POST(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const userId = searchParams.get('userId');
+
+  if (!userId) {
+    return new Response(JSON.stringify({ error: 'Missing userId' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert(
-        JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT as string)
-      ),
+    const revocationCount = await tokenManager.revokeAllTokens(userId);
+    return new Response(JSON.stringify({ success: true, revokedCount }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      },
     });
   } catch (error) {
-    console.error('Failed to initialize Firebase admin SDK', error);
+    console.error('Revocation error:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
 
-/**
- * Validate a Firebase ID token and return its payload.
- * Throws if token is invalid or expired.
- */
-export async function validateIdToken(token: string) {
-  if (!admin.apps.length) {
-    throw new Error('Firebase admin SDK not initialized');
-  }
-  return await admin.auth().verifyIdToken(token);
-}
-
-/**
- * Extract user ID from a validated token payload.
- */
-export function getUserIdFromPayload(payload: any): string {
-  return payload.uid;
-}
-
-/**
- * Simple revocation store (in-memory for demo).
- * In production, use Redis or database.
- */
-const revokedTokens = new Set<string>();
-
-/**
- * Mark token as revoked
- * @param token Raw token or uid+authTime
- */
-export function revokeToken(token: string): void {
-  revokedTokens.add(token);
-}
-
-/**
- * Check if token is revoked
- * @param token Raw token string
- * @returns True if revoked
- */
-export function isTokenRevoked(token: string): boolean {
-  return revokedTokens.has(token);
-}
-
-/**
- * JWT authentication middleware
- * Returns 401 if token is missing/invalid/revoked
- */
-export async function requireAuth(req: Request): Promise<any> {
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const token = authHeader.replace('Bearer ', '');
-
-  if (!token) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-
-  try {
-    const payload = await validateIdToken(token);
-    // Check revocation
-    if (isTokenRevoked(token)) {
-      return new Response('Unauthorized', { status: 401 });
-    }
-    // Check IP binding
-    const payloadIP = payload.ip || req.headers.get('x-forwarded-for') || 'unknown';
-    const requestIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
-    if (payloadIP !== requestIP) {
-      return new Response('Unauthorized (IP mismatch)', { status: 401 });
-    }
-    return payload;
-  } catch (error) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-}
+// Token manager instance for auth endpoint
+const tokenManager = new TokenManager();
