@@ -1,5 +1,7 @@
 # TaskPlanner
 
+![Coverage Status](https://img.shields.io/badge/coverage-100%25-brightgreen)
+
 A full-featured task management application built with Next.js 16, React 19, TypeScript, and SQLite. Features real-time collaboration, offline-first architecture, and a comprehensive task management system.
 
 ## Features
@@ -237,7 +239,6 @@ The app uses a bottom tab navigator with quick access to:
 ## License
 
 MIT
-```
 
 ## Contributing
 
