@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { ensureDbInitialized } from '@/lib/db-init';
 import { jsonSuccess, jsonError } from '@/lib/api-response';
-import { verifyRefreshToken, generateAccessToken } from '@/lib/auth-enhanced';
+import { verifyRefreshToken, updateRefreshToken, generateAccessToken } from '@/lib/auth-enhanced';
+import { redisClient } from '@/lib/redis';
 
 ensureDbInitialized();
 
@@ -14,18 +15,34 @@ export async function POST(_req: NextRequest) {
       return jsonError('Refresh token required', 400, 'MISSING_TOKEN');
     }
 
-    // Verify refresh token
-    const userId = await verifyRefreshToken(refreshToken);
-    if (!userId) {
-      return jsonError('Invalid or expired refresh token', 401, 'INVALID_TOKEN');
+    // Check revocation list
+    const revoked = await redisClient.SISMEMBER('revoked:tokens', refreshToken);
+    if (revoked) {
+      return jsonError('Token has been revoked', 401, 'REVOKED_TOKEN');
     }
 
-    // Generate new access token
-    const accessToken = await generateAccessToken(userId);
+    // Verify token
+    const userId = await verifyRefreshToken(refreshToken);
+    if (!userId) {
+      return jsonError('Invalid or expired token', 401, 'INVALID_TOKEN');
+    }
 
-    return jsonSuccess({ accessToken });
+    // Update token in Redis
+    const newRefreshToken = await updateRefreshToken(userId);
+    await redisClient.SADD('active:tokens', newRefreshToken);
+    await redisClient.SADD('revoked:tokens', refreshToken);
+    await redisClient.EXPIRE('active:tokens', 1200); // 20 minutes TTL
+
+    // Generate tokens
+    const accessToken = await generateAccessToken(userId);
+    const newRefreshToken = await generateRefreshToken(userId);
+
+    return jsonSuccess({
+      accessToken,
+      refreshToken: newRefreshToken
+    });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to refresh token';
+    const message = error instanceof Error ? error.message : 'Token refresh failed';
     return jsonError(message, 500, 'REFRESH_ERROR');
   }
 }
