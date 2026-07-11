@@ -1,0 +1,184 @@
+openapi: 3.0.3
+info:
+  title: Rate Limiter API Documentation
+  version: 1.0.0
+  description: |
+    TaskPlanner Rate Limiter Service
+    Provides distributed rate limiting with Redis support and integrated security features.
+servers:
+  - url: http://localhost:3000
+    description: Development Server
+  - url: https://api.taskplanner.com
+    description: Production Server
+
+components:
+  schemas:
+    RateLimitResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the request was allowed
+        limit:
+          type: integer
+          description: Maximum requests allowed in the window
+          example: 100
+        remaining:
+          type: integer
+          description: Remaining requests before limit
+          example: 95
+        reset:
+          type: integer
+          description: Unix timestamp when limit resets
+          example: 1625097600
+        error:
+          type: string
+          description: Error message (only present on failure)
+          example: "Too many requests"
+        code:
+          type: string
+          description: Error code (only present on failure)
+          example: "RATE_LIMITED"
+
+    RateLimitHeaders:
+      type: object
+      properties:
+        'Retry-After':
+          type: string
+          description: Seconds to wait before next request
+          example: "60"
+        'X-RateLimit-Limit':
+          type: string
+          description: Maximum requests allowed
+          example: "100"
+        'X-RateLimit-Remaining':
+          type: string
+          description: Requests remaining in current window
+          example: "0"
+        'X-RateLimit-Reset':
+          type: string
+          description: Unix timestamp of window reset
+          example: "1625097600"
+        'Content-Security-Policy':
+          type: string
+          description: CSP header for security
+          example: "default-src 'self'"
+        'Strict-Transport-Security':
+          type: string
+          description: HSTS header
+          example: "max-age=31536000; includeSubDomains"
+
+paths:
+  /api/middleware/rate-limiter:
+    get:
+      summary: Check rate limit status
+      description: |
+        Returns current rate limit status without consuming a request.
+        Useful for clients to check their remaining quota.
+      responses:
+        '200':
+          description: Rate limit status retrieved
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitResponse'
+
+    post:
+      summary: Apply rate limiting to request
+      description: |
+        Middleware endpoint that enforces rate limits.
+        Forwards to handler on success, returns error on limit exceeded.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                handler:
+                  type: object
+                  description: Handler configuration for successful requests
+      responses:
+        '200':
+          description: Request processed successfully
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: string
+            X-RateLimit-Remaining:
+              schema:
+                type: string
+            X-RateLimit-Reset:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitResponse'
+        '429':
+          description: Too Many Requests - Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: string
+            X-RateLimit-Limit:
+              schema:
+                type: string
+            X-RateLimit-Remaining:
+              schema:
+                type: string
+            X-RateLimit-Reset:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitResponse'
+
+securitySchemes:
+  bearerAuth:
+    type: http
+    scheme: bearer
+    bearerFormat: JWT
+
+headers:
+  X-RateLimit-Limit:
+    schema:
+      type: string
+      example: "100"
+  X-RateLimit-Remaining:
+    schema:
+      type: string
+      example: "99"
+  X-RateLimit-Reset:
+    schema:
+      type: string
+      example: "1625097600"
+
+x-codeSamples:
+  - lang: 'curl'
+    source: |
+      curl -H "x-api-key: YOUR_API_KEY" \
+           -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+           https://api.taskplanner.com/api/middleware/rate-limiter
+  - lang: 'javascript'
+    source: |
+      const response = await fetch('/api/middleware/rate-limiter', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'x-api-key': apiKey
+        }
+      });
+      const data = await response.json();
+
+x-queue:
+  - name: rate_limit
+    description: "Redis queue for rate limiting metrics"
+    redis_key_pattern: "rate_limit:{client_key}"
