@@ -9,7 +9,12 @@ import fs from 'fs';
 import path from 'path';
 
 const reportPath = path.join('reports', 'radiator-report.json');
-const webhookUrl = process.env.SLACK_WEBHOOK_URL || 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX';
+const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+
+if (!webhookUrl) {
+  console.error('SLACK_WEBHOOK_URL environment variable must be set');
+  process.exit(1);
+}
 
 if (!fs.existsSync(reportPath)) {
   console.error('Radiator report not found at', reportPath);
@@ -29,7 +34,7 @@ const message = {
 fetch(webhookUrl, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(message)
+  body: JSON.stringify(message),
 })
   .then(() => {
     console.log('✅ Notification sent to Slack');
